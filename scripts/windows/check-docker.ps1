@@ -83,7 +83,9 @@ try {
             serverVersion = [string]$version2
             dockerExe     = [string]$dockerExe
             wslHeal       = $wslHeal
-        } -Warnings @('Ran wsl --update / wsl --shutdown and retried; if Docker UI still says WSL is old, restart Windows once or run Troubleshooting - WSL update (admin).')
+            # Keep out of `warnings`: wizard treats any warning as yellow even when Docker is healthy.
+            recoveryNote  = 'Ran wsl --update / wsl --shutdown and retried. If Docker still says WSL is old, restart Windows once or use Troubleshooting - WSL update (admin).'
+        }
         Write-Output (Write-ScriptJson $payload)
         exit 0
     }
@@ -100,7 +102,8 @@ try {
             dockerExe     = [string]$dockerExe
             wslHeal       = $wslHeal
             dockerEngine  = $dockEng
-        } -Warnings @('We started com.docker.service and relaunched Docker Desktop; engine needed extra time beyond the first wait.')
+            recoveryNote  = 'Started com.docker.service and/or Docker Desktop; extra wait before the engine answered is normal on a cold install.'
+        }
         Write-Output (Write-ScriptJson $payload)
         exit 0
     }
