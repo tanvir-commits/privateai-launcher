@@ -42,7 +42,12 @@ try {
         }
         catch { }
 
-        $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker is installed but the engine is not responding (WSL update retry did not help).' -Details @{
+        $failMsg = 'Docker is installed but the engine is not responding after WSL refresh.'
+        if ($wslHeal.ok -and ($wslHeal.tail -match 'already')) {
+            $failMsg = 'WSL reports it is already current, but Docker still will not start the engine. Fully quit Docker from the system tray, restart Windows once, then run this check again (or open Docker Desktop after reboot).'
+        }
+
+        $payload = New-ScriptResult -Ok $false -Status error -Message $failMsg -Details @{
             wslHeal = $wslHeal
         } -Errors @(
             [pscustomobject]@{ code = 'DOCKER_NOT_RUNNING'; message = [string]$firstErr }

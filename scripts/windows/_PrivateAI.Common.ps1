@@ -249,6 +249,13 @@ function Get-PrivateAITailText {
     return $Text.Substring($Text.Length - $MaxLen)
 }
 
+function Get-PrivateAINormalizedConsoleText {
+    param([AllowNull()][string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return '' }
+    # wsl.exe often emits UTF-16-style output; piping through Out-String can leave U+0000 between ASCII chars.
+    return ([regex]::Replace($Text, '\x00', '')).Trim()
+}
+
 <#
     Updates the WSL inbox package (fixes Docker "WSL needs updating"). Prefer --web-download when Store is missing.
     Run elevated when possible. Requires WSL optional components to be enabled (may need reboot after DISM first).
@@ -276,7 +283,7 @@ function Update-PrivateAIWslInPlace {
 
     $verOut = ''
     try {
-        $verOut = (& $wsl --version 2>&1 | Out-String).Trim()
+        $verOut = Get-PrivateAINormalizedConsoleText (& $wsl --version 2>&1 | Out-String)
     }
     catch { }
 
@@ -287,9 +294,18 @@ function Update-PrivateAIWslInPlace {
     catch {
         $outWeb = [string]$_.Exception.Message
     }
+    $outWeb = Get-PrivateAINormalizedConsoleText $outWeb
     $ecWeb = $LASTEXITCODE
     if ($ecWeb -eq 0) {
+        try {
+            $null = (& $wsl --set-default-version 2 2>&1 | Out-String)
+        }
+        catch { }
         Stop-PrivateAIWsl
+        try {
+            $verOut = Get-PrivateAINormalizedConsoleText (& $wsl --version 2>&1 | Out-String)
+        }
+        catch { }
         return [pscustomobject]@{
             ok       = $true
             method   = 'web-download'
@@ -306,9 +322,18 @@ function Update-PrivateAIWslInPlace {
     catch {
         $outDef = [string]$_.Exception.Message
     }
+    $outDef = Get-PrivateAINormalizedConsoleText $outDef
     $ecDef = $LASTEXITCODE
     if ($ecDef -eq 0) {
+        try {
+            $null = (& $wsl --set-default-version 2 2>&1 | Out-String)
+        }
+        catch { }
         Stop-PrivateAIWsl
+        try {
+            $verOut = Get-PrivateAINormalizedConsoleText (& $wsl --version 2>&1 | Out-String)
+        }
+        catch { }
         return [pscustomobject]@{
             ok       = $true
             method   = 'default'
@@ -324,7 +349,7 @@ function Update-PrivateAIWslInPlace {
         method   = 'failed'
         exitCode = $ecDef
         version  = $verOut
-        tail     = (Get-PrivateAITailText -Text $combined -MaxLen 2500)
+        tail     = (Get-PrivateAITailText -Text (Get-PrivateAINormalizedConsoleText $combined) -MaxLen 2500)
     }
 }
 
