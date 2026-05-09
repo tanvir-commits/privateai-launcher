@@ -24,8 +24,28 @@ try {
         exit 0
     }
     catch {
-        $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker is installed but the engine is not responding.' -Details @{} -Errors @(
-            [pscustomobject]@{ code = 'DOCKER_NOT_RUNNING'; message = $_.Exception.Message }
+        $firstErr = $_.Exception.Message
+        $wslHeal = Update-PrivateAIWslInPlace
+        Stop-PrivateAIWsl
+        Start-Sleep -Seconds 3
+        try {
+            $version2 = & $dockerExe version --format '{{.Server.Version}}' 2>$null
+            if (-not [string]::IsNullOrWhiteSpace($version2)) {
+                $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is responding after WSL refresh.' -Details @{
+                    serverVersion = [string]$version2
+                    dockerExe     = [string]$dockerExe
+                    wslHeal       = $wslHeal
+                } -Warnings @('Ran wsl --update / wsl --shutdown and retried; if Docker UI still says WSL is old, restart Windows once or run Troubleshooting - WSL update (admin).')
+                Write-Output (Write-ScriptJson $payload)
+                exit 0
+            }
+        }
+        catch { }
+
+        $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker is installed but the engine is not responding (WSL update retry did not help).' -Details @{
+            wslHeal = $wslHeal
+        } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_NOT_RUNNING'; message = [string]$firstErr }
         )
         Write-Output (Write-ScriptJson $payload)
         exit 1

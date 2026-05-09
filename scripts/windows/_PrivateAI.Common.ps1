@@ -253,6 +253,15 @@ function Get-PrivateAITailText {
     Updates the WSL inbox package (fixes Docker "WSL needs updating"). Prefer --web-download when Store is missing.
     Run elevated when possible. Requires WSL optional components to be enabled (may need reboot after DISM first).
 #>
+function Stop-PrivateAIWsl {
+    $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
+    if (-not (Test-Path -LiteralPath $wsl)) { return }
+    try {
+        $null = & $wsl --shutdown 2>&1
+    }
+    catch { }
+}
+
 function Update-PrivateAIWslInPlace {
     $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
     if (-not (Test-Path -LiteralPath $wsl)) {
@@ -280,6 +289,7 @@ function Update-PrivateAIWslInPlace {
     }
     $ecWeb = $LASTEXITCODE
     if ($ecWeb -eq 0) {
+        Stop-PrivateAIWsl
         return [pscustomobject]@{
             ok       = $true
             method   = 'web-download'
@@ -298,6 +308,7 @@ function Update-PrivateAIWslInPlace {
     }
     $ecDef = $LASTEXITCODE
     if ($ecDef -eq 0) {
+        Stop-PrivateAIWsl
         return [pscustomobject]@{
             ok       = $true
             method   = 'default'

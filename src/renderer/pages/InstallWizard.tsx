@@ -24,7 +24,13 @@ const STEPS: WizardStep[] = [
     elevated: true,
     timeoutMs: 900_000
   },
-  { id: 'docker', title: 'Check Docker Desktop', script: 'check-docker.ps1' },
+  {
+    id: 'docker',
+    title: 'Check Docker Desktop',
+    script: 'check-docker.ps1',
+    elevated: true,
+    timeoutMs: 180_000
+  },
   { id: 'openwebui', title: 'Install / verify Open WebUI', script: 'install-openwebui.ps1' },
   { id: 'comfy', title: 'Install / verify ComfyUI', script: 'install-comfyui.ps1' },
   { id: 'models', title: 'Download starter models', script: 'download-models.ps1' },
