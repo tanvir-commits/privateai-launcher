@@ -1,6 +1,22 @@
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
+    # When Docker CLI + Linux engine already answer, skip slow steps (ACL takeown/icacls, DISM,
+    # wsl --update) — those can take many minutes while the UI shows "Installing" even though Docker is fine.
+    $dockerExeFast = Get-DockerExecutablePath
+    if (-not [string]::IsNullOrWhiteSpace($dockerExeFast)) {
+        $verFast = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExeFast
+        if (-not [string]::IsNullOrWhiteSpace($verFast)) {
+            $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is already installed and running.' -Details @{
+                dockerExe       = [string]$dockerExeFast
+                serverVersion = [string]$verFast
+                skippedHeavyPrereqs = $true
+            }
+            Write-Output (Write-ScriptJson $payload)
+            exit 0
+        }
+    }
+
     # Run first while elevated: wrong ownership here blocks Docker (blue banner in admin console).
     $aclFix = Repair-DockerProgramDataFolder
     if (-not $aclFix.ok) {
@@ -51,7 +67,7 @@ try {
     $dockerExe = Get-DockerExecutablePath
     if ($null -ne $dockerExe) {
         try {
-            $version = & $dockerExe version --format '{{.Server.Version}}' 2>$null
+            $version = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExe
             if (-not [string]::IsNullOrWhiteSpace($version)) {
                 $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is already installed and running.' -Details @{
                     dockerExe       = [string]$dockerExe

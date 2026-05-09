@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import modelProfiles from '@config/model-profiles.json'
 import { ActionButton } from '../components/ActionButton'
 import { LogPanel } from '../components/LogPanel'
 import { StepCard, type StepState } from '../components/StepCard'
 import type { ScriptResult } from '@shared/scriptContract'
+
+/** First profile with an Ollama tag — kept in sync with Models page starter recommendations. */
+const WIZARD_STARTER_OLLAMA_MODEL =
+  modelProfiles.profiles.find((p) => typeof p.ollamaPull === 'string' && p.ollamaPull.length > 0)
+    ?.ollamaPull ?? 'qwen2.5:7b'
 
 type WizardStep = {
   id: string
@@ -32,8 +38,13 @@ const STEPS: WizardStep[] = [
     timeoutMs: 180_000
   },
   { id: 'openwebui', title: 'Install / verify Open WebUI', script: 'install-openwebui.ps1' },
-  { id: 'comfy', title: 'Install / verify ComfyUI', script: 'install-comfyui.ps1' },
-  { id: 'models', title: 'Download starter models', script: 'download-models.ps1' },
+  { id: 'comfy', title: 'Check ComfyUI (optional)', script: 'install-comfyui.ps1' },
+  {
+    id: 'models',
+    title: 'Download starter models',
+    script: 'download-models.ps1',
+    timeoutMs: 900_000
+  },
   { id: 'cfg-ow', title: 'Configure Open WebUI', script: 'configure-openwebui.ps1' },
   { id: 'cfg-comfy', title: 'Configure ComfyUI integration', script: 'configure-comfyui.ps1' },
   { id: 'health', title: 'Run health check', script: 'health-check.ps1' }
@@ -45,7 +56,7 @@ const RUNNING_STATUS_LABEL: Partial<Record<string, string>> = {
   'docker-install': 'Installing',
   docker: 'Checking',
   openwebui: 'Installing',
-  comfy: 'Installing',
+  comfy: 'Checking',
   models: 'Downloading',
   'cfg-ow': 'Configuring',
   'cfg-comfy': 'Configuring',
@@ -59,11 +70,12 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'ollama-check': 'Checking Ollama…',
   ollama: 'Installing or verifying Ollama…',
   'docker-install':
-    'Installing or verifying Docker Desktop (admin). DISM (WSL + VM Platform), ProgramData ACL fix, wsl --update, then winget. One reboot may be required first; Approve UAC. Can take 5-15+ minutes; Log heartbeats every ~12s.',
+    'Installing or verifying Docker Desktop (admin). If the engine already runs, this step finishes quickly; otherwise DISM/WSL/winget/ACL work can take 5–15+ minutes. Approve UAC. If Docker Desktop opens, finish any update or onboarding there first. Log lines every ~12s.',
   docker: 'Checking Docker engine…',
   openwebui: 'Installing or verifying Open WebUI…',
-  comfy: 'Installing or verifying ComfyUI…',
-  models: 'Downloading models (sizes vary; can take a long time)…',
+  comfy:
+    'Checking if ComfyUI answers on localhost (optional). PrivateAI does not install ComfyUI yet — install/start it yourself if you want workflows.',
+  models: `Downloading starter Ollama model (${WIZARD_STARTER_OLLAMA_MODEL}); size varies — can take many minutes.`,
   'cfg-ow': 'Applying Open WebUI configuration…',
   'cfg-comfy': 'Applying ComfyUI configuration…',
   health: 'Running health checks…'
@@ -120,7 +132,9 @@ export default function InstallWizard() {
         appendLog(
           `--- ${step.script} started${step.elevated ? ' [elevated - approve UAC if Windows shows it]' : ''} ---`
         )
-        const r: ScriptResult = await window.privateai.runScript(step.script, undefined, {
+        const scriptArgs =
+          step.id === 'models' ? { Model: WIZARD_STARTER_OLLAMA_MODEL } : undefined
+        const r: ScriptResult = await window.privateai.runScript(step.script, scriptArgs, {
           elevated: step.elevated,
           timeoutMs: step.timeoutMs
         })
@@ -129,9 +143,16 @@ export default function InstallWizard() {
           `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
         )
         if (r.details && Object.keys(r.details).length > 0) {
-          if (!r.ok || (r.warnings.length > 0 && step.id === 'docker-install')) {
+          if (
+            !r.ok ||
+            (r.warnings.length > 0 &&
+              (step.id === 'docker-install' || step.id === 'system'))
+          ) {
             appendLog(`details: ${JSON.stringify(r.details).slice(0, 4000)}`)
           }
+        }
+        if (!r.ok && r.errors.length > 0) {
+          appendLog(`errors: ${JSON.stringify(r.errors).slice(0, 4000)}`)
         }
         setMessages((m) => m.map((v, idx) => (idx === i ? r.message : v)))
         setStates((s) =>

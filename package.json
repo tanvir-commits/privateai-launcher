@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "test:ps": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/_run-all-smoke.ps1",
     "test:all": "npm run typecheck && npm run test && npm run test:ps",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "npm run build && playwright test",
     "go": "node scripts/task.mjs",
     "go:dev": "node scripts/task.mjs dev",
     "go:test": "node scripts/task.mjs test:all"
@@ -24,6 +26,7 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^22.10.1",

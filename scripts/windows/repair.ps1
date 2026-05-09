@@ -111,8 +111,8 @@ function Repair-DockerEngineWindows {
 
 function Repair-OpenWebuiContainer {
     $name = 'privateai-open-webui'
-    docker.exe start $name *> $null 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $start = Invoke-PrivateAIDocker -ArgList @('start', $name) -OutputCharLimit 2000
+    if ($start.ExitCode -ne 0) {
         return New-ScriptResult -Ok $false -Status warning -Message 'Could not start Open WebUI container automatically. Re-run install-openwebui.ps1.' -Details @{ container = $name } -Errors @(
             [pscustomobject]@{ code = 'OPENWEBUI_CONTAINER_STOPPED'; message = 'docker start failed' }
         )

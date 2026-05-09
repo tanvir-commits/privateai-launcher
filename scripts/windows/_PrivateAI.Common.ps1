@@ -148,6 +148,73 @@ function Get-DockerExecutablePath {
 }
 
 <#
+    Run docker.exe with stdout/stderr captured via temp files.
+
+    PrivateAI scripts use $ErrorActionPreference = 'Stop'. Windows PowerShell 5 maps docker CLI
+    stderr (e.g. `docker inspect` when a container is missing) to terminating NativeCommandError
+    even when using 2>&1. Start-Process redirection avoids that so callers can use ExitCode.
+#>
+function Invoke-PrivateAIDocker {
+    param(
+        [Parameter(Mandatory)][string[]]$ArgList,
+        [int]$OutputCharLimit = 8000,
+        [string]$DockerExePath = ''
+    )
+    if ([string]::IsNullOrWhiteSpace($DockerExePath)) {
+        $DockerExePath = Get-DockerExecutablePath
+        if ([string]::IsNullOrWhiteSpace($DockerExePath)) {
+            throw 'docker.exe not found (PATH / Docker Desktop install).'
+        }
+    }
+
+    $fileId = [Guid]::NewGuid().ToString('n')
+    $outPath = Join-Path $env:TEMP "privateai-docker-$fileId-out.txt"
+    $errPath = Join-Path $env:TEMP "privateai-docker-$fileId-err.txt"
+    Remove-Item -LiteralPath $outPath, $errPath -Force -ErrorAction SilentlyContinue
+    try {
+        $p = Start-Process -FilePath $DockerExePath -ArgumentList $ArgList `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $outPath `
+            -RedirectStandardError $errPath
+        $exit = [int]$p.ExitCode
+        $outTxt = if (Test-Path -LiteralPath $outPath) { [System.IO.File]::ReadAllText($outPath) } else { '' }
+        $errTxt = if (Test-Path -LiteralPath $errPath) { [System.IO.File]::ReadAllText($errPath) } else { '' }
+        $merged = (($outTxt + "`n" + $errTxt).Trim())
+        if ($merged.Length -gt $OutputCharLimit) {
+            $merged = $merged.Substring(0, $OutputCharLimit) + '…'
+        }
+        return @{ ExitCode = [int]$exit; Output = [string]$merged }
+    }
+    finally {
+        Remove-Item -LiteralPath $outPath, $errPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+<#
+    Runs `docker version --format '{{.Server.Version}}'` without tripping NativeCommandError under
+    $ErrorActionPreference Stop. Returns trimmed server version text, or $null if the engine is not ready.
+#>
+function Get-PrivateAIDockerServerVersion {
+    param(
+        [Parameter(Mandatory)][string]$DockerExePath,
+        [int]$OutputCharLimit = 4000
+    )
+    $r = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
+        -ArgList @('version', '--format', '{{.Server.Version}}') `
+        -OutputCharLimit $OutputCharLimit
+    if (($null -eq $r) -or ([int]$r.ExitCode -ne 0)) {
+        return $null
+    }
+    foreach ($line in (([string]$r.Output) -split "`n")) {
+        $trim = $line.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($trim)) {
+            return $trim
+        }
+    }
+    return $null
+}
+
+<#
     Docker Desktop fails with "ProgramData\DockerDesktop must be owned by an elevated account"
     when the folder exists with wrong ownership. Call from an elevated session before install.
 #>

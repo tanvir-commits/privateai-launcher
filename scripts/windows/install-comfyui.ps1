@@ -16,11 +16,13 @@ try {
     }
     catch { }
 
-    $payload = New-ScriptResult -Ok $false -Status warning -Message 'ComfyUI is not detected on localhost. Install ComfyUI Desktop or portable, then enable --listen on port 8188.' -Details @{
+    # ok=true + warnings: this step only probes localhost; ComfyUI is not installed by PrivateAI yet.
+    # If we used ok=false here, the Install Wizard would show a hard Error chip and stop the run.
+    $payload = New-ScriptResult -Ok $true -Status warning -Message 'ComfyUI is not detected on localhost. Install ComfyUI Desktop or portable, then enable --listen on port 8188.' -Details @{
         url        = "http://localhost:$port"
         comfyGuide = 'https://github.com/comfyanonymous/ComfyUI'
-    } -Errors @(
-        [pscustomobject]@{ code = 'COMFYUI_INSTALL_REQUIRED'; message = 'User action required: install/start ComfyUI.' }
+    } -Warnings @(
+        'Optional for chat-only stacks. User action: install/start ComfyUI on port 8188, then re-run the wizard or use Services.'
     )
     Write-Output (Write-ScriptJson $payload)
     exit 0

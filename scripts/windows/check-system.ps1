@@ -66,8 +66,31 @@ try {
     if ($vmMon -eq $false) {
         $warnings += 'Second-level address translation (SLAT) not reported by WMI. Some CPUs need it enabled in BIOS for Hyper-V / Docker.'
     }
+    # HypervisorPresent is true on many physical PCs when WSL2, Docker Desktop, or Hypervisor Platform runs.
+    # Only warn when the machine identity looks like a guest VM — see Win32_ComputerSystem Model/Manufacturer.
     if ($hypervisorPresent -eq $true) {
-        $warnings += 'Windows reports a hypervisor (often a VM). Enable nested virtualization for the VM, or install Docker on physical hardware.'
+        $sysModel = ''
+        $sysManufacturer = ''
+        try {
+            $sysModel = [string]$cs.Model
+            $sysManufacturer = [string]$cs.Manufacturer
+        }
+        catch { }
+
+        $looksLikeVmGuest =
+            ($sysModel -match '(?i)virtual\s+machine') -or
+            ($sysModel -match '(?i)vmware') -or
+            ($sysModel -match '(?i)virtualbox') -or
+            ($sysModel -match '(?i)qemu') -or
+            ($sysModel -match '(?i)\bkvm\b') -or
+            (
+                ($sysManufacturer -match '(?i)^Microsoft\s+Corporation$') -and
+                ($sysModel -match '(?i)virtual')
+            )
+
+        if ($looksLikeVmGuest) {
+            $warnings += 'This session looks like a virtual machine guest. Enable nested virtualization for VMs, or run Docker Desktop on bare metal.'
+        }
     }
 
     $details = [ordered]@{

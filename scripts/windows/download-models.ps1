@@ -1,5 +1,6 @@
 param(
-    [string]$Model = ''
+    # Default matches config/model-profiles.json starter text chat profile for CLI / manual runs.
+    [string]$Model = 'qwen2.5:7b'
 )
 
 . "$PSScriptRoot\_PrivateAI.Common.ps1"

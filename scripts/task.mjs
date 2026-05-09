@@ -74,6 +74,28 @@ function testAll() {
   die(testPsRun())
 }
 
+function playwrightTestRun() {
+  return spawnSync(
+    process.execPath,
+    [path.join(root, 'node_modules/@playwright/test/cli.js'), 'test'],
+    { cwd: root, stdio: 'inherit', shell: false }
+  ).status ?? 1
+}
+
+function testE2e() {
+  die(playwrightTestRun())
+}
+
+function testE2eCi() {
+  const b = spawnSync(process.execPath, ['node_modules/electron-vite/bin/electron-vite.js', 'build'], {
+    cwd: root,
+    stdio: 'inherit',
+    shell: false
+  })
+  if ((b.status ?? 1) !== 0) die(b.status ?? 1)
+  die(playwrightTestRun())
+}
+
 const name = process.argv[2]
 
 switch (name) {
@@ -105,7 +127,7 @@ switch (name) {
   default:
     console.error(`Unknown task: ${name ?? '(none)'}`)
     console.error(
-      'Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|verify-ps-parse|test:ps|test:all>'
+      'Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|verify-ps-parse|test:ps|test:all|test:e2e|test:e2e:ci>'
     )
     die(1)
 }
