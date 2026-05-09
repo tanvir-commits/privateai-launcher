@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import modelProfiles from '@config/model-profiles.json'
-import { ActionButton } from '../components/ActionButton'
-import { LogPanel } from '../components/LogPanel'
-import { StepCard, type StepScriptProgress, type StepState } from '../components/StepCard'
-import type { ScriptProgressEvent } from '@shared/scriptProgress'
-
-/** Same UI payload within this window skips a React update (fewer expensive re-renders during install). */
-function progressThrottleCoalesce(ev: ScriptProgressEvent): string {
-  return `${ev.phase}|${ev.percent ?? 'x'}|${ev.detail ?? ''}`
-}
-
-type ProgressThrottleGate = { at: number; sig: string }
 import type { ScriptResult } from '@shared/scriptContract'
+import type { ScriptProgressEvent } from '@shared/scriptProgress'
 import {
   emptyWizardInstallState,
   persistedStepFromResult,
@@ -20,6 +10,16 @@ import {
   type PersistedPortableComfy,
   type WizardInstallPersisted
 } from '@shared/wizardInstallPersist'
+import { ActionButton } from '../components/ActionButton'
+import { LogPanel } from '../components/LogPanel'
+import { StepCard, type StepScriptProgress, type StepState } from '../components/StepCard'
+
+/** Same UI payload within this window skips a React update (fewer expensive re-renders during install). */
+function progressThrottleCoalesce(ev: ScriptProgressEvent): string {
+  return `${ev.phase}|${ev.percent ?? 'x'}|${ev.detail ?? ''}`
+}
+
+type ProgressThrottleGate = { at: number; sig: string }
 
 function comfyPortableProgressLine(ev: ScriptProgressEvent | null): {
   caption: string
@@ -293,9 +293,13 @@ export default function InstallWizard() {
   /** Forces the real installer scripts for ids in this set once (preflight skips disabled). */
   const forceInstallerRef = useRef<Set<string>>(new Set())
 
+  const mergeDetails = (prev: ScriptResult['details']): Record<string, unknown> =>
+    typeof prev === 'object' && prev !== null ? { ...(prev as object) } : {}
+
   useEffect(() => {
     let cancelled = false
-    void window.privateai.getWizardInstallState().then((p) => {
+    void (async () => {
+      const p = await window.privateai.getWizardInstallState()
       if (cancelled) return
       wizardPersistRef.current = p
       const hc = hydrateCoreFromDisk(p.core)
@@ -309,7 +313,68 @@ export default function InstallWizard() {
       setOptVersionSubtitles(ho.subtitles)
       setOptChipKinds(ho.chips)
       setPortableComfyPersist(p.portableComfy ?? null)
-    })
+
+      const row = p.core['docker-install']
+      const msg = (row?.message ?? '').toLowerCase()
+      const staleElevatedJson =
+        row?.state === 'error' &&
+        (msg.includes('valid json') ||
+          msg.includes('invalid_script_output') ||
+          msg.includes('elevated script'))
+      if (!staleElevatedJson) return
+
+      const pr = await window.privateai.runScript('probe-docker-engine.ps1', undefined, {
+        elevated: false,
+        timeoutMs: 120_000,
+        progressToken: globalThis.crypto.randomUUID()
+      })
+      if (cancelled) return
+
+      let okResult: ScriptResult | null = pr.ok ? pr : null
+      if (!okResult) {
+        const ch = await window.privateai.runScript('check-docker.ps1', undefined, {
+          elevated: false,
+          timeoutMs: 220_000,
+          progressToken: globalThis.crypto.randomUUID()
+        })
+        if (cancelled) return
+        if (ch.ok) {
+          okResult = {
+            ...ch,
+            message: `${ch.message} Recovered: Docker is OK; earlier step only failed elevated JSON parsing.`,
+            details: { ...mergeDetails(ch.details), wizardProbeSkippedInstall: true },
+            warnings: [...ch.warnings]
+          }
+        }
+      } else {
+        okResult = {
+          ...pr,
+          message: `${pr.message} Recovered: stale wizard error cleared (engine reachable).`,
+          details: mergeDetails(pr.details),
+          warnings: [...pr.warnings]
+        }
+      }
+      if (!okResult || cancelled) return
+
+      const snap = persistedStepFromResult({
+        stepId: 'docker-install',
+        persistState: 'success',
+        message: okResult.message,
+        result: okResult
+      })
+      const next: WizardInstallPersisted = {
+        ...wizardPersistRef.current,
+        core: { ...wizardPersistRef.current.core, 'docker-install': snap }
+      }
+      const written = await window.privateai.setWizardInstallState(next)
+      if (cancelled) return
+      wizardPersistRef.current = written
+      const hc2 = hydrateCoreFromDisk(written.core)
+      setCoreStates(hc2.states)
+      setCoreMessages(hc2.messages)
+      setCoreVersionSubtitles(hc2.subtitles)
+      setCoreChipKinds(hc2.chips)
+    })()
     return () => {
       cancelled = true
     }
@@ -412,9 +477,6 @@ export default function InstallWizard() {
     [appendLog]
   )
 
-  const mergeDetails = (prev: ScriptResult['details']): Record<string, unknown> =>
-    typeof prev === 'object' && prev !== null ? { ...(prev as object) } : {}
-
   const tryInstallPreflightProbe = async (
     step: WizardStep,
     progressToken: string
@@ -423,7 +485,7 @@ export default function InstallWizard() {
 
     const tokenOpts = {
       elevated: false as boolean,
-      timeoutMs: step.id === 'docker-install' ? 90_000 : 140_000,
+      timeoutMs: step.id === 'docker-install' ? 240_000 : 140_000,
       progressToken
     }
 
@@ -442,11 +504,23 @@ export default function InstallWizard() {
     if (step.id === 'docker-install') {
       appendLog(`--- preflight: probe-docker-engine.ps1 (avoids elevated install-docker.ps1 when possible)`)
       const pr = await window.privateai.runScript('probe-docker-engine.ps1', undefined, tokenOpts)
-      if (!pr.ok) return null
+      if (pr.ok) {
+        return {
+          ...pr,
+          details: mergeDetails(pr.details),
+          warnings: [...pr.warnings]
+        }
+      }
+      appendLog(
+        `--- preflight: engine probe inconclusive; check-docker.ps1 (non-admin, longer wait) ---`
+      )
+      const ch = await window.privateai.runScript('check-docker.ps1', undefined, tokenOpts)
+      if (!ch.ok) return null
       return {
-        ...pr,
-        details: mergeDetails(pr.details),
-        warnings: [...pr.warnings]
+        ...ch,
+        message: `${ch.message} Install script skipped (check-docker probe).`,
+        details: { ...mergeDetails(ch.details), wizardProbeSkippedInstall: true },
+        warnings: [...ch.warnings]
       }
     }
 
