@@ -41,7 +41,29 @@ function Repair-DockerVirtualizationPrereqs {
             rebootRequired    = $true
         } -Warnings @('Restart required (DISM 3010) before virtualization is active. This is expected.')
     }
-    return New-ScriptResult -Ok $true -Status success -Message 'WSL and Virtual Machine Platform are enabled (no reboot was required by DISM).' -Details @{ prerequisiteLog = @($r.logLines) }
+    $w = Update-PrivateAIWslInPlace
+    if (-not $w.ok) {
+        return New-ScriptResult -Ok $false -Status error -Message 'WSL features are on but wsl --update failed. See details or run wsl --update in an admin terminal.' -Details @{
+            prerequisiteLog = @($r.logLines)
+            wslUpdate         = $w
+        } -Errors @(
+            [pscustomobject]@{ code = 'WSL_UPDATE_FAILED'; message = [string]$w.tail }
+        )
+    }
+    return New-ScriptResult -Ok $true -Status success -Message 'WSL optional features are on and the WSL package was updated.' -Details @{
+        prerequisiteLog = @($r.logLines)
+        wslUpdate         = $w
+    }
+}
+
+function Repair-WslUpdate {
+    $w = Update-PrivateAIWslInPlace
+    if (-not $w.ok) {
+        return New-ScriptResult -Ok $false -Status error -Message 'wsl --update failed. See details.' -Details @{ wslUpdate = $w } -Errors @(
+            [pscustomobject]@{ code = 'WSL_UPDATE_FAILED'; message = [string]$w.tail }
+        )
+    }
+    return New-ScriptResult -Ok $true -Status success -Message 'WSL updated successfully.' -Details @{ wslUpdate = $w }
 }
 
 function Repair-DockerProgramDataAcl {
@@ -83,6 +105,7 @@ try {
     $result = switch ($Code.ToUpperInvariant()) {
         'OLLAMA_NOT_RUNNING' { Repair-OllamaNotRunning }
         'DOCKER_VIRTUALIZATION_PREREQS' { Repair-DockerVirtualizationPrereqs }
+        'WSL_UPDATE' { Repair-WslUpdate }
         'DOCKER_PROGRAMDATA_ACL' { Repair-DockerProgramDataAcl }
         'DOCKER_NOT_RUNNING' { Repair-DockerNotRunning }
         'OPENWEBUI_CONTAINER_STOPPED' { Repair-OpenWebuiContainer }

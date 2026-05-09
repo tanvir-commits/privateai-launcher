@@ -37,6 +37,17 @@ try {
         exit 0
     }
 
+    $wslUp = Update-PrivateAIWslInPlace
+    if (-not $wslUp.ok) {
+        $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker needs an up-to-date WSL kernel but wsl --update failed. Use Troubleshooting - WSL update (admin), or run wsl --update in an elevated terminal, then retry this step.' -Details @{
+            wslUpdate = $wslUp
+        } -Errors @(
+            [pscustomobject]@{ code = 'WSL_UPDATE_FAILED'; message = [string]$wslUp.tail }
+        )
+        Write-Output (Write-ScriptJson $payload)
+        exit 1
+    }
+
     $dockerExe = Get-DockerExecutablePath
     if ($null -ne $dockerExe) {
         try {

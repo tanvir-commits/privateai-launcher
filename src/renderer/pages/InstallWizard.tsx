@@ -53,7 +53,7 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'ollama-check': 'Checking Ollama…',
   ollama: 'Installing or verifying Ollama…',
   'docker-install':
-    'Installing or verifying Docker Desktop (admin). Enables WSL + Virtual Machine Platform via DISM, fixes ProgramData ownership if needed, then winget. One Windows restart may be required (the wizard will say so). Approve UAC. Can take 5-15+ minutes; the Log adds a line every ~12s.',
+    'Installing or verifying Docker Desktop (admin). DISM (WSL + VM Platform), ProgramData ACL fix, wsl --update, then winget. One reboot may be required first; Approve UAC. Can take 5-15+ minutes; Log heartbeats every ~12s.',
   docker: 'Checking Docker engine…',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy: 'Installing or verifying ComfyUI…',

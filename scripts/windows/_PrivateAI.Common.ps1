@@ -242,3 +242,78 @@ function Enable-PrivateAIDockerWindowsOptionalFeatures {
     }
 }
 
+function Get-PrivateAITailText {
+    param([string]$Text, [int]$MaxLen = 2000)
+    if ([string]::IsNullOrEmpty($Text)) { return '' }
+    if ($Text.Length -le $MaxLen) { return $Text }
+    return $Text.Substring($Text.Length - $MaxLen)
+}
+
+<#
+    Updates the WSL inbox package (fixes Docker "WSL needs updating"). Prefer --web-download when Store is missing.
+    Run elevated when possible. Requires WSL optional components to be enabled (may need reboot after DISM first).
+#>
+function Update-PrivateAIWslInPlace {
+    $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
+    if (-not (Test-Path -LiteralPath $wsl)) {
+        return [pscustomobject]@{
+            ok       = $false
+            method   = 'none'
+            exitCode = -1
+            version  = ''
+            tail     = 'wsl.exe not found under System32.'
+        }
+    }
+
+    $verOut = ''
+    try {
+        $verOut = (& $wsl --version 2>&1 | Out-String).Trim()
+    }
+    catch { }
+
+    $outWeb = ''
+    try {
+        $outWeb = (& $wsl --update --web-download 2>&1 | Out-String)
+    }
+    catch {
+        $outWeb = [string]$_.Exception.Message
+    }
+    $ecWeb = $LASTEXITCODE
+    if ($ecWeb -eq 0) {
+        return [pscustomobject]@{
+            ok       = $true
+            method   = 'web-download'
+            exitCode = 0
+            version  = $verOut
+            tail     = (Get-PrivateAITailText -Text $outWeb -MaxLen 1200)
+        }
+    }
+
+    $outDef = ''
+    try {
+        $outDef = (& $wsl --update 2>&1 | Out-String)
+    }
+    catch {
+        $outDef = [string]$_.Exception.Message
+    }
+    $ecDef = $LASTEXITCODE
+    if ($ecDef -eq 0) {
+        return [pscustomobject]@{
+            ok       = $true
+            method   = 'default'
+            exitCode = 0
+            version  = $verOut
+            tail     = (Get-PrivateAITailText -Text $outDef -MaxLen 1200)
+        }
+    }
+
+    $combined = "web-download exit $ecWeb`n$(Get-PrivateAITailText -Text $outWeb -MaxLen 1200)`n--update exit $ecDef`n$(Get-PrivateAITailText -Text $outDef -MaxLen 1200)"
+    return [pscustomobject]@{
+        ok       = $false
+        method   = 'failed'
+        exitCode = $ecDef
+        version  = $verOut
+        tail     = (Get-PrivateAITailText -Text $combined -MaxLen 2500)
+    }
+}
+

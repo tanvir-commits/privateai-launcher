@@ -6,7 +6,7 @@ const GUIDES: { title: string; body: string }[] = [
   {
     title: 'Docker: "Virtualization support not detected"',
     body: [
-      'What the launcher can do automatically: on the elevated Docker install step (and the repair below), we run DISM to turn on "Windows Subsystem for Linux" and "Virtual Machine Platform". If Windows returns exit 3010, you need one restart — that is normal and not optional from software.',
+      "What the launcher can do automatically: on the elevated Docker install step (and repairs below), we run DISM for WSL + Virtual Machine Platform, then wsl --update (same fix as Docker's WSL needs updating screen). If DISM returns 3010, reboot once first - that is normal.",
       '',
       'What no app can do for you: enable CPU virtualization in UEFI/BIOS (Intel VT-x / AMD-V). If it stays off, Docker will keep failing until you change firmware settings once.',
       '',
@@ -54,6 +54,12 @@ const COMMON: { code: string; title: string; hint: string }[] = [
     title: 'Docker: enable WSL + Virtual Machine Platform (admin)',
     hint:
       'Runs DISM to enable optional Windows features Docker/WSL2 needs. Approve UAC. If the result says restart, reboot once then try Docker again.'
+  },
+  {
+    code: 'WSL_UPDATE',
+    title: 'WSL: update kernel (admin)',
+    hint:
+      'Runs wsl --update (with web download fallback). Use when Docker says WSL needs updating. Approve UAC; can take several minutes.'
   }
 ]
 
