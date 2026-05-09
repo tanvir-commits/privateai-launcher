@@ -28,7 +28,8 @@
   ],
   "win": {
     "target": ["nsis"],
-    "artifactName": "${productName}-${version}-Setup.${ext}"
+    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "sign": null
   },
   "nsis": {
     "oneClick": false,

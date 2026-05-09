@@ -1,6 +1,7 @@
 {
   "name": "privateai-launcher",
   "version": "1.0.0",
+  "author": "https://github.com/tanvir-commits/privateai-launcher",
   "private": true,
   "type": "module",
   "description": "PrivateAI Launcher — Windows control panel for local Ollama, Open WebUI, and ComfyUI",
