@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { PrivateaiApi } from '@shared/preloadApi'
+import type { ScriptProgressEvent } from '@shared/scriptProgress'
 
 const api: PrivateaiApi = {
   getStatus: () => ipcRenderer.invoke('status:get'),
@@ -7,7 +8,16 @@ const api: PrivateaiApi = {
   runHealth: () => ipcRenderer.invoke('health:run'),
   runScript: (name, args, options) => ipcRenderer.invoke('script:run', { name, args, ...options }),
   runRepair: (code) => ipcRenderer.invoke('repair:run', { code }),
-  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  onScriptProgress: (listener) => {
+    const wrapped = (_e: unknown, payload: ScriptProgressEvent): void => {
+      listener(payload)
+    }
+    ipcRenderer.on('script:progress', wrapped)
+    return () => {
+      ipcRenderer.removeListener('script:progress', wrapped)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('privateai', api)

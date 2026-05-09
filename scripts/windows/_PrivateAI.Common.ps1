@@ -74,6 +74,24 @@ function Get-OllamaExecutablePath {
     return $null
 }
 
+function Start-PrivateAIOllamaIfInstalled {
+    $svcNames = @('Ollama', 'ollama')
+    foreach ($n in $svcNames) {
+        try {
+            $s = Get-Service -Name $n -ErrorAction SilentlyContinue
+            if ($null -ne $s -and $s.Status -ne 'Running') {
+                Start-Service -Name $n -ErrorAction SilentlyContinue | Out-Null
+            }
+        }
+        catch { }
+    }
+
+    $exe = Get-OllamaExecutablePath
+    if ($null -ne $exe) {
+        Start-Process -FilePath $exe -ArgumentList 'serve' -WindowStyle Hidden | Out-Null
+    }
+}
+
 function Update-PrivateAIPathFromRegistry {
     $m = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
     $u = [System.Environment]::GetEnvironmentVariable('Path', 'User')

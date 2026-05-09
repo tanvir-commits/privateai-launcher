@@ -53,4 +53,26 @@ test.describe('Electron launcher (smoke)', () => {
       timeout: 15_000
     })
   })
+
+  /**
+   * Clicks Run core install and waits for early scripts (does not wait for Docker/models).
+   * Proves Electron IPC, PowerShell runner, and wizard wiring for the hot path.
+   */
+  test('Run core install starts and finishes system + GPU checks', async () => {
+    test.setTimeout(300_000)
+    const page = await app.firstWindow()
+    await waitForLauncherUi(page)
+    await page.getByRole('link', { name: 'Install Wizard' }).click()
+    await expect(page.getByRole('heading', { name: 'Install Wizard' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Run core install' }).click()
+
+    await expect(page.getByText(/--- check-system\.ps1 started ---/)).toBeVisible({
+      timeout: 90_000
+    })
+    await expect(page.getByText(/check-system\.ps1 => ok=true/)).toBeVisible({ timeout: 120_000 })
+
+    await expect(page.getByText(/--- check-gpu\.ps1 started ---/)).toBeVisible({ timeout: 120_000 })
+    await expect(page.getByText(/check-gpu\.ps1 => ok=true/)).toBeVisible({ timeout: 120_000 })
+  })
 })

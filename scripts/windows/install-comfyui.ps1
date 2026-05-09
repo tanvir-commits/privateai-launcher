@@ -16,14 +16,12 @@ try {
     }
     catch { }
 
-    # ok=true + warnings: this step only probes localhost; ComfyUI is not installed by PrivateAI yet.
-    # If we used ok=false here, the Install Wizard would show a hard Error chip and stop the run.
-    $payload = New-ScriptResult -Ok $true -Status warning -Message 'ComfyUI is not detected on localhost. Install ComfyUI Desktop or portable, then enable --listen on port 8188.' -Details @{
+    # Probe-only: not installed is normal unless the user opted into Comfy workflows.
+    # ok=true success + no warnings so optional wizard steps stay green until Comfy answers on the port.
+    $payload = New-ScriptResult -Ok $true -Status success -Message 'ComfyUI is not detected on localhost (normal until you install/start it on this port).' -Details @{
         url        = "http://localhost:$port"
-        comfyGuide = 'https://github.com/comfyanonymous/ComfyUI'
-    } -Warnings @(
-        'Optional for chat-only stacks. User action: install/start ComfyUI on port 8188, then re-run the wizard or use Services.'
-    )
+        comfyGuide = 'https://docs.comfy.org/get_started/pre_package'
+    }
     Write-Output (Write-ScriptJson $payload)
     exit 0
 }

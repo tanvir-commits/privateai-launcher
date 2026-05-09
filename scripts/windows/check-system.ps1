@@ -60,11 +60,15 @@ try {
     $warnings = @()
     if ($ramBytes -lt 8GB) { $warnings += 'Less than 8 GB RAM detected.' }
     if ($null -ne $diskFree -and $diskFree -lt 50GB) { $warnings += 'Less than 50 GB free on C:.' }
-    if ($virtFw -eq $false) {
-        $warnings += 'CPU firmware virtualization looks disabled (WMI). Enable Intel VT-x or AMD-V in UEFI/BIOS, then reboot. Required for Docker Desktop / WSL2.'
-    }
-    if ($vmMon -eq $false) {
-        $warnings += 'Second-level address translation (SLAT) not reported by WMI. Some CPUs need it enabled in BIOS for Hyper-V / Docker.'
+    # WMI processor flags are often false negatives when a hypervisor is already active (WSL2 / Docker / VBS).
+    # Only nudge about UEFI settings when Windows does not report a hypervisor layer.
+    if ($hypervisorPresent -ne $true) {
+        if ($virtFw -eq $false) {
+            $warnings += 'CPU firmware virtualization looks disabled (WMI). Enable Intel VT-x or AMD-V in UEFI/BIOS, then reboot. Required for Docker Desktop / WSL2.'
+        }
+        if ($vmMon -eq $false) {
+            $warnings += 'Second-level address translation (SLAT) not reported by WMI. Some CPUs need it enabled in BIOS for Hyper-V / Docker.'
+        }
     }
     # HypervisorPresent is true on many physical PCs when WSL2, Docker Desktop, or Hypervisor Platform runs.
     # Only warn when the machine identity looks like a guest VM — see Win32_ComputerSystem Model/Manufacturer.

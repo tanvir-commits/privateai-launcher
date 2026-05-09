@@ -1,4 +1,5 @@
 import type { DashboardStatus } from './dashboardTypes'
+import type { ScriptProgressEvent } from './scriptProgress'
 import type { ScriptResult } from './scriptContract'
 
 export interface HardwareScanPayload {
@@ -14,8 +15,10 @@ export interface PrivateaiApi {
   runScript: (
     name: string,
     args?: Record<string, string>,
-    options?: { elevated?: boolean; timeoutMs?: number }
+    options?: { elevated?: boolean; timeoutMs?: number; progressToken?: string }
   ) => Promise<ScriptResult>
+  /** Subscribe to coarse script progress (optional `progressToken` on `runScript`). Returns unsubscribe. */
+  onScriptProgress: (listener: (payload: ScriptProgressEvent) => void) => () => void
   runRepair: (code: string) => Promise<ScriptResult>
   openExternal: (url: string) => Promise<void>
 }

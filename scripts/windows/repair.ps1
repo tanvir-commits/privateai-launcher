@@ -5,22 +5,7 @@ param(
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 function Repair-OllamaNotRunning {
-    $svcNames = @('Ollama', 'ollama')
-    foreach ($n in $svcNames) {
-        try {
-            $s = Get-Service -Name $n -ErrorAction SilentlyContinue
-            if ($null -ne $s -and $s.Status -ne 'Running') {
-                Start-Service -Name $n -ErrorAction SilentlyContinue | Out-Null
-            }
-        }
-        catch { }
-    }
-
-    $exe = Get-OllamaExecutablePath
-    if ($null -ne $exe) {
-        Start-Process -FilePath $exe -ArgumentList 'serve' -WindowStyle Hidden | Out-Null
-    }
-
+    Start-PrivateAIOllamaIfInstalled
     return New-ScriptResult -Ok $true -Status success -Message 'Attempted to start Ollama service/process.' -Details @{ code = 'OLLAMA_NOT_RUNNING' }
 }
 

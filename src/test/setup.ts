@@ -21,7 +21,8 @@ const mockApi: PrivateaiApi = {
   runHealth: async () => okScript('healthy'),
   runScript: async () => okScript('script'),
   runRepair: async () => okScript('repair'),
-  openExternal: async () => {}
+  openExternal: async () => {},
+  onScriptProgress: () => () => {}
 }
 
 if (typeof window !== 'undefined') {

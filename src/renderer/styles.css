@@ -416,3 +416,35 @@ a {
   border-color: #5c2a2e;
   background: linear-gradient(135deg, #1a1214 0%, var(--surface) 100%);
 }
+
+@keyframes privateai-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+.progress-track {
+  height: 10px;
+  background: rgba(154, 168, 184, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill--determinate {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent), #61e8ae);
+  transition: width 0.35s ease-out;
+}
+
+.progress-fill--indeterminate {
+  width: 36%;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  animation: privateai-indeterminate 1.15s ease-in-out infinite;
+}

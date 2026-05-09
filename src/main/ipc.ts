@@ -1,5 +1,11 @@
 import { ipcMain, shell } from 'electron'
 import { runPowerShellScript } from './scriptRunner'
+import {
+  prepareScriptProgressFile,
+  sanitizeProgressToken,
+  scriptProgressJsonPath,
+  subscribeScriptProgressFromFile
+} from './scriptProgressPoll'
 import { getDashboardStatus, refreshHardwareScan, setDashboardStatus } from './statusStore'
 import { runHealthCheck } from './health'
 
@@ -35,15 +41,37 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'script:run',
     async (
-      _e,
-      payload: { name: string; args?: Record<string, string>; elevated?: boolean; timeoutMs?: number }
+      event,
+      payload: {
+        name: string
+        args?: Record<string, string>
+        elevated?: boolean
+        timeoutMs?: number
+        progressToken?: string
+      }
     ) => {
-    return runPowerShellScript({
-      scriptName: payload.name,
-      args: payload.args,
-      timeoutMs: payload.timeoutMs ?? 180_000,
-      elevated: payload.elevated === true
-    })
+      const token = sanitizeProgressToken(payload.progressToken)
+      const args: Record<string, string> = { ...(payload.args ?? {}) }
+      delete args.ProgressFile
+
+      let detachProgress: (() => void) | undefined
+      if (token !== null) {
+        const fp = scriptProgressJsonPath(token)
+        await prepareScriptProgressFile(fp)
+        args.ProgressFile = fp
+        detachProgress = subscribeScriptProgressFromFile(event.sender, token, fp)
+      }
+
+      try {
+        return await runPowerShellScript({
+          scriptName: payload.name,
+          args,
+          timeoutMs: payload.timeoutMs ?? 180_000,
+          elevated: payload.elevated === true
+        })
+      } finally {
+        detachProgress?.()
+      }
     }
   )
 

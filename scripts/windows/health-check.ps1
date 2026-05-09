@@ -58,23 +58,37 @@ try {
         $phoneUrl = "http://$($lan):$owPort"
     }
 
+    # Core stack = Ollama + Open WebUI. ComfyUI is optional (image workflows).
     $issues = @()
     if (-not $ollamaOk) { $issues += 'Ollama API not reachable' }
     if (-not $owOk) { $issues += 'Open WebUI not reachable' }
-    if (-not $comfyOk) { $issues += 'ComfyUI not reachable' }
 
-    $ok = $issues.Count -eq 0
-    $msg = if ($ok) { 'All checks passed.' } else { 'Some checks failed.' }
-
-    $details = [ordered]@{
-        ollama     = [pscustomobject]@{ running = [bool]$ollamaOk; url = "http://localhost:$ollamaPort"; models = $models }
-        openWebui  = [pscustomobject]@{ running = [bool]$owOk; url = "http://localhost:$owPort" }
-        comfyui    = [pscustomobject]@{ running = [bool]$comfyOk; url = "http://localhost:$comfyPort" }
-        phoneAccess = [pscustomobject]@{ lanIp = $lan; url = $phoneUrl }
-        issues     = $issues
+    $optionalExtras = @()
+    if (-not $comfyOk) {
+        $optionalExtras += 'ComfyUI is not reachable (optional unless you use image workflows). Install from ComfyUI extras in the wizard when ready.'
     }
 
-    $payload = New-ScriptResult -Ok $ok -Status $(if ($ok) { 'success' } else { 'warning' }) -Message $msg -Details ([pscustomobject]$details)
+    $coreOk = $issues.Count -eq 0
+    $msg = if (-not $coreOk) {
+        'Some core checks failed.'
+    }
+    elseif (-not $comfyOk) {
+        'Core stack healthy. ComfyUI is optional and was not detected.'
+    }
+    else {
+        'All checks passed (including ComfyUI).'
+    }
+
+    $details = [ordered]@{
+        ollama        = [pscustomobject]@{ running = [bool]$ollamaOk; url = "http://localhost:$ollamaPort"; models = $models }
+        openWebui     = [pscustomobject]@{ running = [bool]$owOk; url = "http://localhost:$owPort" }
+        comfyui       = [pscustomobject]@{ running = [bool]$comfyOk; url = "http://localhost:$comfyPort"; optional = $true }
+        phoneAccess   = [pscustomobject]@{ lanIp = $lan; url = $phoneUrl }
+        issues        = $issues
+        optionalExtras = $optionalExtras
+    }
+
+    $payload = New-ScriptResult -Ok $coreOk -Status $(if ($coreOk) { 'success' } else { 'warning' }) -Message $msg -Details ([pscustomobject]$details)
     Write-Output (Write-ScriptJson $payload)
     exit 0
 }
