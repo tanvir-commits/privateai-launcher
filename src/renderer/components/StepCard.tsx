@@ -30,6 +30,10 @@ export function StepCard(props: {
   title: string
   message: string
   state: StepState
+  /** Shown in the status chip while `running` (e.g. Installing). */
+  runningStatusLabel?: string
+  /** Indeterminate bar under the message while the step runs (no real % from scripts). */
+  showIndeterminateProgress?: boolean
   children?: ReactNode
 }) {
   const tone = stateTone(props.state)
@@ -43,12 +47,17 @@ export function StepCard(props: {
           <span className={'dot ' + dot} />
           <strong style={{ fontSize: 14 }}>{props.title}</strong>
           <span className="muted" style={{ fontSize: 12 }}>
-            {stateLabel(props.state)}
+            {props.state === 'running' && props.runningStatusLabel
+              ? props.runningStatusLabel
+              : stateLabel(props.state)}
           </span>
         </div>
         <div className="muted" style={{ fontSize: 13 }}>
           {props.message}
         </div>
+        {props.showIndeterminateProgress && props.state === 'running' ? (
+          <div className="step-progress" aria-label="In progress" role="progressbar" />
+        ) : null}
         {props.children}
       </div>
     </div>

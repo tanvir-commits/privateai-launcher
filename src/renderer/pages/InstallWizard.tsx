@@ -33,6 +33,43 @@ const STEPS: WizardStep[] = [
   { id: 'health', title: 'Run health check', script: 'health-check.ps1' }
 ]
 
+/** Status chip text while a step is running (installer UX). */
+const RUNNING_STATUS_LABEL: Partial<Record<string, string>> = {
+  ollama: 'Installing',
+  'docker-install': 'Installing',
+  docker: 'Checking',
+  openwebui: 'Installing',
+  comfy: 'Installing',
+  models: 'Downloading',
+  'cfg-ow': 'Configuring',
+  'cfg-comfy': 'Configuring',
+  health: 'Checking'
+}
+
+/** Secondary line while scripts run (replaces generic "Running script…"). */
+const RUNNING_MESSAGE: Partial<Record<string, string>> = {
+  system: 'Scanning system…',
+  gpu: 'Checking GPU and drivers…',
+  'ollama-check': 'Checking Ollama…',
+  ollama: 'Installing or verifying Ollama…',
+  'docker-install':
+    'Installing or verifying Docker Desktop. This often takes several minutes; approve UAC if Windows asks. Waiting for docker.exe after winget…',
+  docker: 'Checking Docker engine…',
+  openwebui: 'Installing or verifying Open WebUI…',
+  comfy: 'Installing or verifying ComfyUI…',
+  models: 'Downloading models (sizes vary; can take a long time)…',
+  'cfg-ow': 'Applying Open WebUI configuration…',
+  'cfg-comfy': 'Applying ComfyUI configuration…',
+  health: 'Running health checks…'
+}
+
+function runningLine(step: WizardStep): string {
+  if (step.id in RUNNING_MESSAGE) {
+    return RUNNING_MESSAGE[step.id]!
+  }
+  return 'Running script…'
+}
+
 export default function InstallWizard() {
   const initial = useMemo(() => STEPS.map(() => 'pending' as StepState), [])
   const [states, setStates] = useState<StepState[]>(initial)
@@ -48,7 +85,7 @@ export default function InstallWizard() {
     for (let i = 0; i < STEPS.length; i++) {
       const step = STEPS[i]!
       setStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
-      setMessages((m) => m.map((v, idx) => (idx === i ? 'Running script…' : v)))
+      setMessages((m) => m.map((v, idx) => (idx === i ? runningLine(step) : v)))
       try {
         if (!step.script) {
           setStates((s) => s.map((v, idx) => (idx === i ? 'success' : v)))
@@ -62,8 +99,10 @@ export default function InstallWizard() {
         appendLog(
           `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
         )
-        if (!r.ok && r.details && Object.keys(r.details).length > 0) {
-          appendLog(`details: ${JSON.stringify(r.details).slice(0, 4000)}`)
+        if (r.details && Object.keys(r.details).length > 0) {
+          if (!r.ok || (r.warnings.length > 0 && step.id === 'docker-install')) {
+            appendLog(`details: ${JSON.stringify(r.details).slice(0, 4000)}`)
+          }
         }
         setMessages((m) => m.map((v, idx) => (idx === i ? r.message : v)))
         setStates((s) =>
@@ -102,6 +141,8 @@ export default function InstallWizard() {
             title={s.title}
             message={messages[idx] ?? ''}
             state={states[idx] ?? 'pending'}
+            runningStatusLabel={RUNNING_STATUS_LABEL[s.id]}
+            showIndeterminateProgress
           />
         ))}
       </div>

@@ -231,6 +231,35 @@ a {
   border: 1px solid var(--border);
 }
 
+.step-progress {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+  position: relative;
+}
+
+.step-progress::after {
+  content: '';
+  position: absolute;
+  left: -35%;
+  width: 35%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: step-progress-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes step-progress-slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(380%);
+  }
+}
+
 /* Hardware Doctor */
 .hw-layout {
   margin-top: 20px;

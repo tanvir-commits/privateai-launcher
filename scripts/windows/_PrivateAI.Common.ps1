@@ -85,6 +85,30 @@ function Update-PrivateAIPathFromRegistry {
     ) -join ';'
 }
 
+function Get-DockerDesktopExePath {
+    $standard = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+    if (Test-Path -LiteralPath $standard) { return [string]$standard }
+
+    $roots = @(
+        (Join-Path $env:ProgramFiles 'Docker'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Docker')
+    )
+    $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+    if (-not [string]::IsNullOrWhiteSpace($pf86)) {
+        $roots += (Join-Path $pf86 'Docker')
+    }
+
+    foreach ($root in $roots) {
+        if ([string]::IsNullOrWhiteSpace($root) -or -not (Test-Path -LiteralPath $root)) {
+            continue
+        }
+        $hit = Get-ChildItem -LiteralPath $root -Filter 'Docker Desktop.exe' -File -Recurse -Depth 9 -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($null -ne $hit) { return [string]$hit.FullName }
+    }
+    return $null
+}
+
 function Get-DockerExecutablePath {
     Update-PrivateAIPathFromRegistry
 
@@ -93,7 +117,9 @@ function Get-DockerExecutablePath {
 
     $candidates = @(
         (Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'),
-        (Join-Path $env:ProgramFiles 'Docker\Docker\resources\docker.exe')
+        (Join-Path $env:ProgramFiles 'Docker\Docker\resources\docker.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Docker\Docker\resources\bin\docker.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Docker\Docker\resources\docker.exe')
     )
     $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
     if (-not [string]::IsNullOrWhiteSpace($pf86)) {
@@ -106,10 +132,13 @@ function Get-DockerExecutablePath {
         }
     }
 
-    # Layout changes between Docker Desktop builds — shallow search under Program Files\Docker
-    $dockerRoot = Join-Path $env:ProgramFiles 'Docker'
-    if (Test-Path -LiteralPath $dockerRoot) {
-        $hit = Get-ChildItem -LiteralPath $dockerRoot -Filter 'docker.exe' -File -Recurse -Depth 8 -ErrorAction SilentlyContinue |
+    # Layout changes / per-user winget — shallow search under Docker roots
+    foreach ($root in @(
+            (Join-Path $env:ProgramFiles 'Docker'),
+            (Join-Path $env:LOCALAPPDATA 'Programs\Docker')
+        )) {
+        if (-not (Test-Path -LiteralPath $root)) { continue }
+        $hit = Get-ChildItem -LiteralPath $root -Filter 'docker.exe' -File -Recurse -Depth 9 -ErrorAction SilentlyContinue |
             Select-Object -First 1
         if ($null -ne $hit) {
             return [string]$hit.FullName
