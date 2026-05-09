@@ -1,10 +1,10 @@
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
-    $cmd = Get-Command ollama -ErrorAction SilentlyContinue
-    if ($null -ne $cmd) {
+    $exe = Get-OllamaExecutablePath
+    if ($null -ne $exe) {
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Ollama is already installed.' -Details @{
-            path = [string]$cmd.Source
+            path = [string]$exe
         }
         Write-Output (Write-ScriptJson $payload)
         exit 0

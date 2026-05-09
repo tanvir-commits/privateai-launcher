@@ -13,8 +13,8 @@ try {
         exit 1
     }
 
-    $cmd = Get-Command ollama -ErrorAction SilentlyContinue
-    if ($null -eq $cmd) {
+    $exe = Get-OllamaExecutablePath
+    if ($null -eq $exe) {
         $payload = New-ScriptResult -Ok $false -Status error -Message 'Ollama is not installed.' -Details @{} -Errors @(
             [pscustomobject]@{ code = 'OLLAMA_NOT_FOUND'; message = 'ollama.exe not found' }
         )
@@ -22,7 +22,7 @@ try {
         exit 1
     }
 
-    & ollama pull $Model | Out-Null
+    & $exe pull $Model | Out-Null
 
     $payload = New-ScriptResult -Ok $true -Status success -Message "Model pull requested/finished for $Model." -Details @{
         model = $Model

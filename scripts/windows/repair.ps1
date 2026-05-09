@@ -16,9 +16,9 @@ function Repair-OllamaNotRunning {
         catch { }
     }
 
-    $cmd = Get-Command ollama -ErrorAction SilentlyContinue
-    if ($null -ne $cmd) {
-        Start-Process -FilePath $cmd.Source -ArgumentList 'serve' -WindowStyle Hidden | Out-Null
+    $exe = Get-OllamaExecutablePath
+    if ($null -ne $exe) {
+        Start-Process -FilePath $exe -ArgumentList 'serve' -WindowStyle Hidden | Out-Null
     }
 
     return New-ScriptResult -Ok $true -Status success -Message 'Attempted to start Ollama service/process.' -Details @{ code = 'OLLAMA_NOT_RUNNING' }

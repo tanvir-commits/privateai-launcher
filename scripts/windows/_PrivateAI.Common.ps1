@@ -48,3 +48,28 @@ function Test-TcpPortFree {
         return $true
     }
 }
+
+<#
+    Ollama winget/user install often lands in LOCALAPPDATA\Programs\Ollama,
+    which Electron-spawned PowerShell may not have on PATH — always probe known paths.
+#>
+function Get-OllamaExecutablePath {
+    $fromPath = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($null -ne $fromPath) { return [string]$fromPath.Source }
+
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
+        (Join-Path $env:ProgramFiles 'Ollama\ollama.exe')
+    )
+    $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+    if (-not [string]::IsNullOrWhiteSpace($pf86)) {
+        $candidates += (Join-Path $pf86 'Ollama\ollama.exe')
+    }
+
+    foreach ($p in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($p) -and (Test-Path -LiteralPath $p)) {
+            return [string]$p
+        }
+    }
+    return $null
+}
