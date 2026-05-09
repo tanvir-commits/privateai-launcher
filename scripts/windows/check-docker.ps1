@@ -47,7 +47,7 @@ try {
 
     Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 10 -Detail 'First engine probe'
 
-    # Cold start / post-WSL-reset: linuxEngine named pipe often returns HTTP 500 for ~1–3 minutes while VM boots.
+    # Cold start: linuxEngine named pipe often returns HTTP 500 for ~1–3 minutes while VM boots.
     $version = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 150 -IntervalSeconds 10 `
         -ProgressFileInner $ProgressFile -ProgressDetail 'Waiting for Docker engine (initial)'
     if (-not [string]::IsNullOrWhiteSpace($version)) {
@@ -70,27 +70,9 @@ try {
         'Docker server version unavailable after initial wait.'
     }
 
-    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 55 -Detail 'Refreshing WSL, then retry'
-
-    $wslHeal = Update-PrivateAIWslInPlace
-    Stop-PrivateAIWsl
-    Start-Sleep -Seconds 3
-    $version2 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 90 -IntervalSeconds 8 `
-        -ProgressFileInner $ProgressFile -ProgressDetail 'After WSL refresh'
-    if (-not [string]::IsNullOrWhiteSpace($version2)) {
-        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 100 -Detail 'Engine responded'
-        $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is responding after WSL refresh.' -Details @{
-            serverVersion = [string]$version2
-            dockerExe     = [string]$dockerExe
-            wslHeal       = $wslHeal
-            # Keep out of `warnings`: wizard treats any warning as yellow even when Docker is healthy.
-            recoveryNote  = 'Ran wsl --update / wsl --shutdown and retried. If Docker still says WSL is old, restart Windows once or use Troubleshooting - WSL update (admin).'
-        }
-        Write-Output (Write-ScriptJson $payload)
-        exit 0
-    }
-
-    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 75 -Detail 'Trying Docker Windows service'
+    # Do not run wsl --update / wsl --shutdown from this script: it is disruptive on some PCs and belongs
+    # under Troubleshooting (repair WSL_UPDATE) or the elevated Docker install path.
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 55 -Detail 'Starting Docker service / Desktop'
 
     $dockEng = Start-PrivateAIDockerWindowsEngine
     $version3 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 120 -IntervalSeconds 10 `
@@ -100,7 +82,6 @@ try {
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker responded after starting Docker Desktop service / app.' -Details @{
             serverVersion = [string]$version3
             dockerExe     = [string]$dockerExe
-            wslHeal       = $wslHeal
             dockerEngine  = $dockEng
             recoveryNote  = 'Started com.docker.service and/or Docker Desktop; extra wait before the engine answered is normal on a cold install.'
         }
@@ -108,19 +89,23 @@ try {
         exit 0
     }
 
-    $failMsg = 'Docker is installed but the engine is not responding after WSL refresh and Windows service start. If you just installed or updated Docker, wait until the tray icon is ready, open Docker Desktop once, then run this step again.'
-    if ($wslHeal.ok -and ($null -ne $wslHeal.tail) -and ($wslHeal.tail -match 'already')) {
-        $failMsg = 'WSL looks current, but the Docker engine still will not answer. Try Troubleshooting - Docker engine (Windows service). If com.docker.service stays stopped, reinstall Docker Desktop or restart Windows once.'
-    }
+    $failMsg = @'
+Docker engine did not respond in time after starting the Windows service / Desktop.
+
+Wait until the Docker tray icon is steady, open Docker Desktop once, then run this step again.
+
+If Docker says WSL needs updating, open Troubleshooting in this launcher and run "WSL: update kernel (admin)" (repair code WSL_UPDATE), then return here. The Install wizard no longer runs wsl --update or wsl --shutdown automatically.
+'@.Trim()
+
     if (-not $dockEng.serviceFound) {
         $failMsg = 'Docker CLI is present but com.docker.service was not found (incomplete install?). Reinstall Docker Desktop from Settings - Apps or docker.com.'
     }
 
     $payload = New-ScriptResult -Ok $false -Status error -Message $failMsg -Details @{
-        wslHeal          = $wslHeal
-        dockerEngine     = $dockEng
-        dockerProbeTail  = $probeFail.Output
-        dockerProbeExit  = $probeFail.ExitCode
+        dockerEngine    = $dockEng
+        dockerProbeTail = $probeFail.Output
+        dockerProbeExit = $probeFail.ExitCode
+        repairHint      = 'Troubleshooting: WSL_UPDATE (WSL kernel) or DOCKER_ENGINE_WINDOWS (service + Desktop).'
     } -Errors @(
         [pscustomobject]@{ code = 'DOCKER_NOT_RUNNING'; message = [string]$firstErr }
     )

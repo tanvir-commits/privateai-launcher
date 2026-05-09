@@ -6,7 +6,7 @@ const GUIDES: { title: string; body: string }[] = [
   {
     title: 'Docker: "Virtualization support not detected"',
     body: [
-      "What the launcher can do automatically: on the elevated Docker install step (and repairs below), we run DISM for WSL + Virtual Machine Platform, then wsl --update (same fix as Docker's WSL needs updating screen). If DISM returns 3010, reboot once first - that is normal.",
+      "What the launcher can do automatically: the elevated Docker install step (and repairs below) can run DISM for WSL + Virtual Machine Platform, then wsl --update (same fix as Docker's WSL needs updating screen). If DISM returns 3010, reboot once first - that is normal. The Install wizard's Check Docker step no longer runs wsl --update or wsl --shutdown on its own — use the WSL repair here if Docker reports an outdated kernel.",
       '',
       'What no app can do for you: enable CPU virtualization in UEFI/BIOS (Intel VT-x / AMD-V). If it stays off, Docker will keep failing until you change firmware settings once.',
       '',

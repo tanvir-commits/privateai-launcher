@@ -182,7 +182,7 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'docker-install':
     'Installing or verifying Docker Desktop (admin). If the engine already runs, this step finishes quickly; otherwise DISM/WSL/winget/ACL work can take 5–15+ minutes. Approve UAC. If Docker Desktop opens, finish any update or onboarding there first. Log lines every ~12s.',
   docker:
-    'Checking the Docker engine. The launcher prefers tray-only startup (no auto dashboard) when Docker settings already exist. First install may still show Docker briefly; WSL updates can add several minutes. This step can run a long time.',
+    'Waiting for the Docker engine. If needed we start com.docker.service or Docker Desktop only — the wizard does not run wsl --update or wsl --shutdown here (use Troubleshooting if Docker reports WSL). First install can still take several minutes.',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy:
     'Checking if ComfyUI answers on localhost after install. Open WebUI only uses images if you connect an image backend in its admin.',
