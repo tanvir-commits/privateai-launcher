@@ -11,7 +11,11 @@ export interface PrivateaiApi {
   getStatus: () => Promise<DashboardStatus>
   scanHardware: () => Promise<HardwareScanPayload>
   runHealth: () => Promise<ScriptResult>
-  runScript: (name: string, args?: Record<string, string>) => Promise<ScriptResult>
+  runScript: (
+    name: string,
+    args?: Record<string, string>,
+    options?: { elevated?: boolean; timeoutMs?: number }
+  ) => Promise<ScriptResult>
   runRepair: (code: string) => Promise<ScriptResult>
   openExternal: (url: string) => Promise<void>
 }

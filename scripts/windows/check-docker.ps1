@@ -1,8 +1,8 @@
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
-    $docker = Get-Command docker.exe -ErrorAction SilentlyContinue
-    if ($null -eq $docker) {
+    $dockerExe = Get-DockerExecutablePath
+    if ($null -eq $dockerExe) {
         $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker is not installed or not on PATH.' -Details @{} -Errors @(
             [pscustomobject]@{ code = 'DOCKER_NOT_FOUND'; message = 'docker.exe not found' }
         )
@@ -11,13 +11,14 @@ try {
     }
 
     try {
-        $version = & docker.exe version --format '{{.Server.Version}}' 2>$null
+        $version = & $dockerExe version --format '{{.Server.Version}}' 2>$null
         if ([string]::IsNullOrWhiteSpace($version)) {
             throw 'Docker server version unavailable (is Docker Desktop running?)'
         }
 
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is installed and responding.' -Details @{
             serverVersion = [string]$version
+            dockerExe     = [string]$dockerExe
         }
         Write-Output (Write-ScriptJson $payload)
         exit 0

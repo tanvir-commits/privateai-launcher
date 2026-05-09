@@ -32,13 +32,20 @@ export function registerIpcHandlers(): void {
     return r
   })
 
-  ipcMain.handle('script:run', async (_e, payload: { name: string; args?: Record<string, string> }) => {
+  ipcMain.handle(
+    'script:run',
+    async (
+      _e,
+      payload: { name: string; args?: Record<string, string>; elevated?: boolean; timeoutMs?: number }
+    ) => {
     return runPowerShellScript({
       scriptName: payload.name,
       args: payload.args,
-      timeoutMs: 180_000
+      timeoutMs: payload.timeoutMs ?? 180_000,
+      elevated: payload.elevated === true
     })
-  })
+    }
+  )
 
   ipcMain.handle('repair:run', async (_e, payload: { code: string }) => {
     return runPowerShellScript({

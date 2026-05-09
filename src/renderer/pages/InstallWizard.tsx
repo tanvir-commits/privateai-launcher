@@ -8,6 +8,8 @@ type WizardStep = {
   id: string
   title: string
   script?: string
+  elevated?: boolean
+  timeoutMs?: number
 }
 
 const STEPS: WizardStep[] = [
@@ -15,6 +17,13 @@ const STEPS: WizardStep[] = [
   { id: 'gpu', title: 'Check GPU', script: 'check-gpu.ps1' },
   { id: 'ollama-check', title: 'Check Ollama', script: 'check-ollama.ps1' },
   { id: 'ollama', title: 'Install / verify Ollama', script: 'install-ollama.ps1' },
+  {
+    id: 'docker-install',
+    title: 'Install / verify Docker Desktop (admin)',
+    script: 'install-docker.ps1',
+    elevated: true,
+    timeoutMs: 900_000
+  },
   { id: 'docker', title: 'Check Docker Desktop', script: 'check-docker.ps1' },
   { id: 'openwebui', title: 'Install / verify Open WebUI', script: 'install-openwebui.ps1' },
   { id: 'comfy', title: 'Install / verify ComfyUI', script: 'install-comfyui.ps1' },
@@ -46,8 +55,13 @@ export default function InstallWizard() {
           setMessages((m) => m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v)))
           continue
         }
-        const r: ScriptResult = await window.privateai.runScript(step.script)
-        appendLog(`${step.script} => ok=${r.ok} status=${r.status}`)
+        const r: ScriptResult = await window.privateai.runScript(step.script, undefined, {
+          elevated: step.elevated,
+          timeoutMs: step.timeoutMs
+        })
+        appendLog(
+          `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
+        )
         setMessages((m) => m.map((v, idx) => (idx === i ? r.message : v)))
         setStates((s) =>
           s.map((v, idx) =>
@@ -67,7 +81,9 @@ export default function InstallWizard() {
   return (
     <div>
       <h1 className="page-title">Install Wizard</h1>
-      <p className="page-sub">Guided setup. Each step is idempotent and logs details on failure.</p>
+      <p className="page-sub">
+        Guided setup. Some steps request Windows administrator approval (UAC) and then resume.
+      </p>
 
       <div className="row-actions" style={{ marginBottom: 16 }}>
         <ActionButton variant="primary" onClick={() => void runAll()}>

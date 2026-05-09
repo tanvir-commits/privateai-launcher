@@ -73,3 +73,24 @@ function Get-OllamaExecutablePath {
     }
     return $null
 }
+
+function Get-DockerExecutablePath {
+    $fromPath = Get-Command docker.exe -ErrorAction SilentlyContinue
+    if ($null -ne $fromPath) { return [string]$fromPath.Source }
+
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'),
+        (Join-Path $env:ProgramFiles 'Docker\Docker\resources\docker.exe')
+    )
+    $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+    if (-not [string]::IsNullOrWhiteSpace($pf86)) {
+        $candidates += (Join-Path $pf86 'Docker\Docker\resources\bin\docker.exe')
+    }
+
+    foreach ($p in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($p) -and (Test-Path -LiteralPath $p)) {
+            return [string]$p
+        }
+    }
+    return $null
+}
