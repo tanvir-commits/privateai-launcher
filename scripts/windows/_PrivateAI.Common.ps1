@@ -74,7 +74,20 @@ function Get-OllamaExecutablePath {
     return $null
 }
 
+function Update-PrivateAIPathFromRegistry {
+    $m = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $u = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    if ([string]::IsNullOrWhiteSpace($m) -and [string]::IsNullOrWhiteSpace($u)) {
+        return
+    }
+    $env:Path = @(
+        @($m, $u) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    ) -join ';'
+}
+
 function Get-DockerExecutablePath {
+    Update-PrivateAIPathFromRegistry
+
     $fromPath = Get-Command docker.exe -ErrorAction SilentlyContinue
     if ($null -ne $fromPath) { return [string]$fromPath.Source }
 
@@ -90,6 +103,16 @@ function Get-DockerExecutablePath {
     foreach ($p in $candidates) {
         if (-not [string]::IsNullOrWhiteSpace($p) -and (Test-Path -LiteralPath $p)) {
             return [string]$p
+        }
+    }
+
+    # Layout changes between Docker Desktop builds — shallow search under Program Files\Docker
+    $dockerRoot = Join-Path $env:ProgramFiles 'Docker'
+    if (Test-Path -LiteralPath $dockerRoot) {
+        $hit = Get-ChildItem -LiteralPath $dockerRoot -Filter 'docker.exe' -File -Recurse -Depth 8 -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($null -ne $hit) {
+            return [string]$hit.FullName
         }
     }
     return $null

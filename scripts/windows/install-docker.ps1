@@ -28,10 +28,52 @@ try {
     }
 
     $out = & winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1
+    $wingetExit = $LASTEXITCODE
     $text = ($out | Out-String)
-    $dockerExe = Get-DockerExecutablePath
+
+    # winget often returns before the MSI/bootstrapper finishes writing docker.exe; PATH in this
+    # session also lags until we refresh from the registry (handled inside Get-DockerExecutablePath).
+    $desktopPath = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+    $deadline = (Get-Date).AddSeconds(240)
+    $dockerExe = $null
+    $launchedDesktop = $false
+    while ($null -eq $dockerExe -and (Get-Date) -lt $deadline) {
+        $dockerExe = Get-DockerExecutablePath
+        if ($null -ne $dockerExe) { break }
+
+        if (-not $launchedDesktop -and (Test-Path -LiteralPath $desktopPath)) {
+            try {
+                Start-Process -FilePath $desktopPath -ErrorAction Stop | Out-Null
+                $launchedDesktop = $true
+            }
+            catch { }
+        }
+        Start-Sleep -Seconds 3
+    }
+
     if ($null -eq $dockerExe) {
+        if (Test-Path -LiteralPath $desktopPath) {
+            try {
+                if (-not $launchedDesktop) {
+                    Start-Process -FilePath $desktopPath | Out-Null
+                }
+            }
+            catch { }
+
+            $payload = New-ScriptResult -Ok $true -Status warning -Message 'Docker Desktop appears installed but docker.exe was not found yet (installer may still be finishing). Try "Check Docker Desktop" again in a minute, or sign out and back in.' -Details @{
+                wingetExitCode     = $wingetExit
+                dockerDesktop      = $desktopPath
+                wingetOutputTail   = $text.Substring([Math]::Max(0, $text.Length - 3000))
+            } -Warnings @(
+                'Wait until Docker Desktop finishes first-time setup, then re-run this step or run the Docker check.',
+                'If it still fails, restart the PC so PATH updates for new terminals.'
+            )
+            Write-Output (Write-ScriptJson $payload)
+            exit 0
+        }
+
         $payload = New-ScriptResult -Ok $false -Status error -Message 'Docker install command finished but docker.exe was not detected.' -Details @{
+            wingetExitCode   = $wingetExit
             wingetOutputTail = $text.Substring([Math]::Max(0, $text.Length - 3000))
         } -Errors @(
             [pscustomobject]@{ code = 'DOCKER_INSTALL_VERIFY_FAILED'; message = 'docker.exe not found after installation attempt.' }
@@ -41,8 +83,9 @@ try {
     }
 
     $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker Desktop install completed.' -Details @{
-        dockerExe      = [string]$dockerExe
-        wingetOutputTail = $text.Substring([Math]::Max(0, $text.Length - 2000))
+        dockerExe          = [string]$dockerExe
+        wingetExitCode     = $wingetExit
+        wingetOutputTail   = $text.Substring([Math]::Max(0, $text.Length - 2000))
     }
     Write-Output (Write-ScriptJson $payload)
     exit 0

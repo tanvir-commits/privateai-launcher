@@ -62,6 +62,9 @@ export default function InstallWizard() {
         appendLog(
           `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
         )
+        if (!r.ok && r.details && Object.keys(r.details).length > 0) {
+          appendLog(`details: ${JSON.stringify(r.details).slice(0, 4000)}`)
+        }
         setMessages((m) => m.map((v, idx) => (idx === i ? r.message : v)))
         setStates((s) =>
           s.map((v, idx) =>
