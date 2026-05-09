@@ -74,8 +74,8 @@ try {
                 wingetOutputTail  = $text.Substring([Math]::Max(0, $text.Length - 3000))
                 wingetListDocker  = $wingetList.Substring([Math]::Max(0, $wingetList.Length - 2000))
             } -Warnings @(
-                'Wait until Docker Desktop completes setup (system tray icon steady), then run "Check Docker Desktop".',
-                'If the CLI is still missing after a reboot, repair Docker Desktop from Windows Settings → Apps.'
+                'Wait until Docker Desktop completes setup (system tray icon steady), then run Check Docker Desktop.',
+                'If the CLI is still missing after a reboot, repair Docker Desktop from Settings - Apps (installed apps).'
             )
             Write-Output (Write-ScriptJson $payload)
             exit 0
