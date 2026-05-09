@@ -152,7 +152,8 @@ try {
                     $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
                     $wslPreheatBeforeDesktopPoll = $true
                 }
-                Start-Process -FilePath $desktopExe -ErrorAction Stop | Out-Null
+                Set-PrivateAIDockerDesktopQuietUiHints
+                Start-Process -FilePath $desktopExe -WindowStyle Minimized -ErrorAction Stop | Out-Null
                 $launchedDesktop = $true
             }
             catch { }
@@ -178,7 +179,8 @@ try {
                     Stop-PrivateAIWsl
                     Start-Sleep -Seconds 2
                     $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
-                    Start-Process -FilePath $desktopFinal | Out-Null
+                    Set-PrivateAIDockerDesktopQuietUiHints
+                    Start-Process -FilePath $desktopFinal -WindowStyle Minimized | Out-Null
                 }
             }
             catch { }

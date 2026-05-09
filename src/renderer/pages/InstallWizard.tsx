@@ -130,7 +130,8 @@ const CORE_STEPS: WizardStep[] = [
     id: 'docker',
     title: 'Check Docker Desktop',
     script: 'check-docker.ps1',
-    elevated: true,
+    /** Must stay non-elevated: elevated wrapper can stall after progress hits 100% while JSON never returns. */
+    elevated: false,
     timeoutMs: 1_800_000
   },
   { id: 'openwebui', title: 'Install / verify Open WebUI', script: 'install-openwebui.ps1' },
@@ -181,7 +182,7 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'docker-install':
     'Installing or verifying Docker Desktop (admin). If the engine already runs, this step finishes quickly; otherwise DISM/WSL/winget/ACL work can take 5–15+ minutes. Approve UAC. If Docker Desktop opens, finish any update or onboarding there first. Log lines every ~12s.',
   docker:
-    'Checking the Docker engine (admin). First Docker Desktop launch often needs you to click through onboarding (e.g. skip sign-in); WSL updates can add several minutes. This step can run a long time.',
+    'Checking the Docker engine. The launcher prefers tray-only startup (no auto dashboard) when Docker settings already exist. First install may still show Docker briefly; WSL updates can add several minutes. This step can run a long time.',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy:
     'Checking if ComfyUI answers on localhost after install. Open WebUI only uses images if you connect an image backend in its admin.',

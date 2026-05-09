@@ -839,6 +839,36 @@ function Stop-PrivateAIWsl {
     catch { }
 }
 
+<#
+    Nudges Docker Desktop toward tray/engine UX: avoid popping the full dashboard on every start.
+    Only edits %APPDATA%\Docker\settings-store.json when present (Docker has created it at least once);
+    otherwise Docker will create defaults on first launch and this runs again on later starts.
+#>
+function Set-PrivateAIDockerDesktopQuietUiHints {
+    $dir = Join-Path $env:APPDATA 'Docker'
+    $path = Join-Path $dir 'settings-store.json'
+    try {
+        if (-not (Test-Path -LiteralPath $path)) {
+            return
+        }
+        $raw = Get-Content -LiteralPath $path -Raw -Encoding utf8
+        if ([string]::IsNullOrWhiteSpace($raw)) {
+            return
+        }
+        $o = $raw | ConvertFrom-Json
+        if ($null -eq $o) {
+            return
+        }
+        $o | Add-Member -NotePropertyName 'openUIOnStartupDisabled' -NotePropertyValue $true -Force
+        $o | Add-Member -NotePropertyName 'disableTips' -NotePropertyValue $true -Force
+        $json = $o | ConvertTo-Json -Depth 100 -Compress
+        Set-Content -LiteralPath $path -Value $json -Encoding utf8
+    }
+    catch {
+        # Non-fatal: Docker may rewrite settings while running.
+    }
+}
+
 function Start-PrivateAIDockerWindowsEngine {
     param(
         [switch]$SkipLaunchDesktop
@@ -869,10 +899,11 @@ function Start-PrivateAIDockerWindowsEngine {
 
     $launched = $false
     if (-not $SkipLaunchDesktop) {
+        Set-PrivateAIDockerDesktopQuietUiHints
         $exe = Get-DockerDesktopExePath
         if ($null -ne $exe -and (Test-Path -LiteralPath $exe)) {
             try {
-                Start-Process -FilePath $exe -ErrorAction SilentlyContinue | Out-Null
+                Start-Process -FilePath $exe -WindowStyle Minimized -ErrorAction SilentlyContinue | Out-Null
                 $launched = $true
             }
             catch { }
