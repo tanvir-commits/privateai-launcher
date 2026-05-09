@@ -1,0 +1,53 @@
+# Build Windows portable zip + NSIS installer and attach to a GitHub Release.
+# Create a release: push an annotated tag, e.g. git tag v1.1.0 && git push origin v1.1.0
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run dist:win
+
+      - name: Zip portable bundle
+        shell: pwsh
+        run: ./scripts/zip-windows-portable.ps1
+
+      - name: Upload to GitHub Release (tag push only)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/PrivateAI-Launcher-*-windows-portable.zip
+            release/*Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Store artifacts (manual workflow run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-build
+          path: |
+            release/PrivateAI-Launcher-*-windows-portable.zip
+            release/*Setup.exe

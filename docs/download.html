@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Download — PrivateAI Launcher</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f14;
+        --surface: #121922;
+        --border: #2a3544;
+        --text: #e8eef5;
+        --muted: #9aa8b8;
+        --accent: #3ddc84;
+      }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+        padding: 32px 20px 48px;
+        max-width: 640px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 8px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin: 0 0 24px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+      }
+      .card h2 {
+        font-size: 1rem;
+        margin: 0 0 12px;
+      }
+      a.btn {
+        display: inline-block;
+        background: var(--accent);
+        color: #0b0f14;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 10px 16px;
+        border-radius: 8px;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+      a.btn.secondary {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      .err {
+        color: #f07178;
+        font-size: 0.9rem;
+      }
+      code {
+        font-size: 0.85em;
+        background: #1a222d;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>PrivateAI Launcher</h1>
+    <p class="muted">Windows downloads (latest GitHub Release).</p>
+    <div id="status" class="card"><p class="muted" style="margin: 0">Loading latest release…</p></div>
+    <div class="card">
+      <h2>How to run the zip (portable)</h2>
+      <ul>
+        <li>Download <code>*-windows-portable.zip</code> from the list below or from Releases.</li>
+        <li>Extract the whole folder (Windows: right-click → Extract All…).</li>
+        <li>Open the extracted folder and run <code>PrivateAI Launcher.exe</code>.</li>
+        <li>If SmartScreen appears, choose “More info” → “Run anyway” (unsigned builds).</li>
+      </ul>
+    </div>
+    <p class="muted" style="font-size: 0.85rem">
+      Official releases:
+      <a href="https://github.com/tanvir-commits/privateai-launcher/releases/latest" style="color: var(--accent)"
+        >github.com/…/releases/latest</a
+      >
+    </p>
+    <script>
+      ;(function () {
+        const REPO = 'tanvir-commits/privateai-launcher'
+        const statusEl = document.getElementById('status')
+        const latestUrl = 'https://github.com/' + REPO + '/releases/latest'
+
+        function esc(s) {
+          return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+        }
+
+        fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+          .then(function (r) {
+            if (!r.ok) throw new Error('GitHub API ' + r.status)
+            return r.json()
+          })
+          .then(function (rel) {
+            const assets = (rel.assets || []).filter(function (a) {
+              return /\.(zip|exe)$/i.test(a.name)
+            })
+            let html = '<h2 style="margin:0 0 12px;font-size:1rem">Latest: ' + esc(rel.tag_name || '') + '</h2>'
+            if (!assets.length) {
+              html +=
+                '<p class="muted" style="margin:0">No .zip or .exe assets on this release yet. Open the release on GitHub and wait for CI, or use the link below.</p>'
+            } else {
+              html += '<p class="muted" style="margin:0 0 12px;font-size:0.9rem">' + esc(rel.name || '') + '</p>'
+              assets.forEach(function (a) {
+                const label = a.name.indexOf('portable') !== -1 ? 'Portable (zip)' : a.name.indexOf('Setup') !== -1 ? 'Installer' : esc(a.name)
+                html +=
+                  '<p style="margin:0 0 10px"><a class="btn" href="' +
+                  esc(a.browser_download_url) +
+                  '">' +
+                  esc(label) +
+                  '</a> <span class="muted">' +
+                  esc((a.size / (1024 * 1024)).toFixed(1) + ' MB') +
+                  '</span></p>'
+              })
+            }
+            html +=
+              '<p style="margin:16px 0 0"><a class="btn secondary" href="' +
+              esc(latestUrl) +
+              '">All files on GitHub</a></p>'
+            statusEl.innerHTML = html
+          })
+          .catch(function (e) {
+            statusEl.innerHTML =
+              '<p class="err">Could not load release list (' +
+              esc(e.message) +
+              ').</p><p><a class="btn" href="' +
+              esc(latestUrl) +
+              '">Open latest release</a></p>'
+          })
+      })()
+    </script>
+  </body>
+</html>

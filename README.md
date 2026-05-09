@@ -2,6 +2,14 @@
 
 PrivateAI Launcher turns a supported Windows NVIDIA PC into a private local AI server by orchestrating **Ollama**, **Open WebUI (Docker)**, and **ComfyUI**.
 
+## Download (Windows)
+
+- **Stable link (GitHub):** [Latest release](https://github.com/tanvir-commits/privateai-launcher/releases/latest) — pick **`PrivateAI-Launcher-*-windows-portable.zip`** to unzip and run, or **`*-Setup.exe`** for an installer.
+- **Landing page (after you enable Pages):** GitHub Pages will serve `docs/download.html` (see [.github/workflows/pages.yml](.github/workflows/pages.yml)). Enable **Settings → Pages → Source: GitHub Actions**, then open `https://tanvir-commits.github.io/privateai-launcher/download.html` (URL follows `https://<user>.github.io/<repo>/…`).
+- **Ship a release from CI:** push a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0` — [Release Windows](.github/workflows/release-windows.yml) builds and uploads the zip and installer to that release.
+
+Local build + zip: `npm run dist:win:zip` → `release/PrivateAI-Launcher-<version>-windows-portable.zip`.
+
 ## Requirements
 
 - Windows 10 22H2+ or Windows 11
