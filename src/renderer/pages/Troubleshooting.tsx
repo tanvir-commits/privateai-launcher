@@ -6,13 +6,13 @@ const GUIDES: { title: string; body: string }[] = [
   {
     title: 'Docker: "Virtualization support not detected"',
     body: [
-      'Signing in to Docker does not fix this. Docker Desktop needs hardware virtualization and the right Windows features.',
+      'What the launcher can do automatically: on the elevated Docker install step (and the repair below), we run DISM to turn on "Windows Subsystem for Linux" and "Virtual Machine Platform". If Windows returns exit 3010, you need one restart — that is normal and not optional from software.',
       '',
-      '1) UEFI/BIOS: Turn on Intel VT-x / AMD-V (sometimes called SVM). Save and reboot.',
-      '2) Windows features (admin PowerShell or Optional Features UI): install Virtual Machine Platform and Windows Subsystem for Linux, then reboot.',
-      '3) If this PC is a VM: enable nested virtualization for that VM in Hyper-V / VMware / VirtualBox settings.',
-      '4) Conflicts: other hypervisors (older VirtualBox/Hyper-V) or "Core isolation" / Memory integrity can block Docker; adjust and reboot.',
-      '5) After changes, open Docker Desktop again. Use Docker docs: View system requirements from the error screen.'
+      'What no app can do for you: enable CPU virtualization in UEFI/BIOS (Intel VT-x / AMD-V). If it stays off, Docker will keep failing until you change firmware settings once.',
+      '',
+      'If this PC is a VM: enable nested virtualization in the host (Hyper-V / VMware / VirtualBox).',
+      '',
+      'Conflicts: Memory integrity / other hypervisors can still block Docker until adjusted.'
     ].join('\n')
   }
 ]
@@ -48,6 +48,12 @@ const COMMON: { code: string; title: string; hint: string }[] = [
     title: 'Docker: ProgramData folder ownership (admin)',
     hint:
       'If Docker says "ProgramData\\DockerDesktop must be owned by an elevated account", this runs takeown/icacls on that folder. Approve UAC.'
+  },
+  {
+    code: 'DOCKER_VIRTUALIZATION_PREREQS',
+    title: 'Docker: enable WSL + Virtual Machine Platform (admin)',
+    hint:
+      'Runs DISM to enable optional Windows features Docker/WSL2 needs. Approve UAC. If the result says restart, reboot once then try Docker again.'
   }
 ]
 

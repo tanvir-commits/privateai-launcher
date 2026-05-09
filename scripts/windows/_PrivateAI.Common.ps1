@@ -190,3 +190,55 @@ function Repair-DockerProgramDataFolder {
     }
 }
 
+<#
+    Enables Windows optional features Docker Desktop / WSL2 needs (no BIOS access from software).
+    Requires admin. DISM exit 3010 = reboot required before kernel picks up changes.
+#>
+function Enable-PrivateAIDockerWindowsOptionalFeatures {
+    $dism = Join-Path $env:SystemRoot 'System32\dism.exe'
+    if (-not (Test-Path -LiteralPath $dism)) {
+        return [pscustomobject]@{
+            ok            = $false
+            rebootNeeded  = $false
+            logLines      = @('dism.exe not found')
+            failedFeature = $null
+            lastExitCode  = -1
+        }
+    }
+
+    $featureNames = @(
+        'Microsoft-Windows-Subsystem-Linux',
+        'VirtualMachinePlatform'
+    )
+
+    $log = [System.Collections.Generic.List[string]]::new()
+    $reboot = $false
+
+    foreach ($fn in $featureNames) {
+        $procArgs = @('/Online', '/Enable-Feature', "/FeatureName:$fn", '/All', '/NoRestart')
+        $p = Start-Process -FilePath $dism -ArgumentList $procArgs -Wait -PassThru -NoNewWindow
+        $ec = if ($null -ne $p.ExitCode) { [int]$p.ExitCode } else { -1 }
+        [void]$log.Add("${fn}: dism exit $ec")
+        if ($ec -eq 3010) {
+            $reboot = $true
+        }
+        elseif ($ec -ne 0) {
+            return [pscustomobject]@{
+                ok            = $false
+                rebootNeeded  = $reboot
+                logLines      = @($log.ToArray())
+                failedFeature = [string]$fn
+                lastExitCode  = $ec
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        ok           = $true
+        rebootNeeded = [bool]$reboot
+        logLines     = @($log.ToArray())
+        failedFeature = $null
+        lastExitCode  = 0
+    }
+}
+

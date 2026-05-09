@@ -16,6 +16,29 @@ try {
         exit 1
     }
 
+    $winVirt = Enable-PrivateAIDockerWindowsOptionalFeatures
+    if (-not $winVirt.ok) {
+        $payload = New-ScriptResult -Ok $false -Status error -Message 'Could not enable Windows Subsystem for Linux and/or Virtual Machine Platform (DISM). See details; you may need an admin session or a supported Windows edition.' -Details @{
+            prerequisiteLog = @($winVirt.logLines)
+            failedFeature     = $winVirt.failedFeature
+            lastExitCode      = $winVirt.lastExitCode
+        } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_WINDOWS_PREREQ_DISM_FAILED'; message = 'DISM enable-feature failed' }
+        )
+        Write-Output (Write-ScriptJson $payload)
+        exit 1
+    }
+    if ($winVirt.rebootNeeded) {
+        $payload = New-ScriptResult -Ok $false -Status error -Message 'Windows applied virtualization features but requires a restart before Docker can start. Restart the PC, then run Install Wizard again from the Docker step.' -Details @{
+            prerequisiteLog = @($winVirt.logLines)
+            rebootRequired    = $true
+        } -Errors @(
+            [pscustomobject]@{ code = 'REBOOT_REQUIRED_FOR_DOCKER_PREREQS'; message = 'Restart required after enabling WSL / Virtual Machine Platform.' }
+        )
+        Write-Output (Write-ScriptJson $payload)
+        exit 1
+    }
+
     $dockerExe = Get-DockerExecutablePath
     if ($null -ne $dockerExe) {
         try {

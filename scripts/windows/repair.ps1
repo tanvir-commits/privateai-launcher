@@ -24,6 +24,28 @@ function Repair-OllamaNotRunning {
     return New-ScriptResult -Ok $true -Status success -Message 'Attempted to start Ollama service/process.' -Details @{ code = 'OLLAMA_NOT_RUNNING' }
 }
 
+function Repair-DockerVirtualizationPrereqs {
+    $r = Enable-PrivateAIDockerWindowsOptionalFeatures
+    if (-not $r.ok) {
+        return New-ScriptResult -Ok $false -Status error -Message 'DISM could not enable WSL / Virtual Machine Platform. See details.' -Details @{
+            prerequisiteLog = @($r.logLines)
+            failedFeature     = $r.failedFeature
+            lastExitCode      = $r.lastExitCode
+        } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_WINDOWS_PREREQ_DISM_FAILED'; message = 'DISM failed' }
+        )
+    }
+    if ($r.rebootNeeded) {
+        return New-ScriptResult -Ok $false -Status error -Message 'Features enabled; restart Windows once, then open Docker Desktop or re-run the Install Wizard Docker step.' -Details @{
+            prerequisiteLog = @($r.logLines)
+            rebootRequired    = $true
+        } -Errors @(
+            [pscustomobject]@{ code = 'REBOOT_REQUIRED_FOR_DOCKER_PREREQS'; message = 'Restart required' }
+        )
+    }
+    return New-ScriptResult -Ok $true -Status success -Message 'WSL and Virtual Machine Platform are enabled (no reboot was required by DISM).' -Details @{ prerequisiteLog = @($r.logLines) }
+}
+
 function Repair-DockerProgramDataAcl {
     $r = Repair-DockerProgramDataFolder
     if ($r.action -eq 'skipped') {
@@ -62,6 +84,7 @@ function Repair-OpenWebuiContainer {
 try {
     $result = switch ($Code.ToUpperInvariant()) {
         'OLLAMA_NOT_RUNNING' { Repair-OllamaNotRunning }
+        'DOCKER_VIRTUALIZATION_PREREQS' { Repair-DockerVirtualizationPrereqs }
         'DOCKER_PROGRAMDATA_ACL' { Repair-DockerProgramDataAcl }
         'DOCKER_NOT_RUNNING' { Repair-DockerNotRunning }
         'OPENWEBUI_CONTAINER_STOPPED' { Repair-OpenWebuiContainer }
