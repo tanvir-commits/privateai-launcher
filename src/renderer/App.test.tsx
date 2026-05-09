@@ -17,5 +17,6 @@ describe('App', () => {
     )
     expect(screen.getByText('PrivateAI Launcher')).toBeInTheDocument()
     expect(screen.getByText('Hardware Doctor')).toBeInTheDocument()
+    expect(screen.getByText('Installed apps')).toBeInTheDocument()
   })
 })

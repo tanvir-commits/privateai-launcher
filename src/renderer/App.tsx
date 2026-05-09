@@ -5,6 +5,7 @@ import InstallWizard from './pages/InstallWizard'
 import Models from './pages/Models'
 import Services from './pages/Services'
 import Troubleshooting from './pages/Troubleshooting'
+import InstalledApps from './pages/InstalledApps'
 
 export default function App() {
   return (
@@ -26,6 +27,9 @@ export default function App() {
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/services">
           Services
         </NavLink>
+        <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/installed">
+          Installed apps
+        </NavLink>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/troubleshooting">
           Troubleshooting
         </NavLink>
@@ -37,6 +41,7 @@ export default function App() {
           <Route path="/install" element={<InstallWizard />} />
           <Route path="/models" element={<Models />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/installed" element={<InstalledApps />} />
           <Route path="/troubleshooting" element={<Troubleshooting />} />
         </Routes>
       </main>

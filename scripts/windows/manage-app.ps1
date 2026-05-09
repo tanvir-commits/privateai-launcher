@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('Ollama', 'OpenWebUi', 'DockerDesktop')][string]$App,
+    [Parameter(Mandatory)][ValidateSet('Ollama', 'OpenWebUi', 'DockerDesktop', 'ComfyPortable')][string]$App,
     [Parameter(Mandatory)][ValidateSet('Restart', 'Update', 'Uninstall', 'Reinstall')][string]$Action,
     [string]$ProgressFile = ''
 )
@@ -232,6 +232,42 @@ try {
                     $payload = New-ScriptResult -Ok $true -Status success -Message 'Open WebUI container recreated via install script.' -Details @{ container = $name }
                     Write-Output (Write-ScriptJson $payload)
                     exit 0
+                }
+            }
+        }
+        'ComfyPortable' {
+            switch ($Action) {
+                'Uninstall' {
+                    $base = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'PrivateAI'
+                    $deploy = Join-Path $base 'ComfyUI_windows_portable'
+                    if (-not (Test-Path -LiteralPath $deploy)) {
+                        $payload = New-ScriptResult -Ok $true -Status success -Message 'ComfyUI portable folder was not present (nothing to remove).' -Details @{ path = $deploy }
+                        Write-Output (Write-ScriptJson $payload)
+                        exit 0
+                    }
+                    try {
+                        Remove-Item -LiteralPath $deploy -Recurse -Force -ErrorAction Stop
+                    }
+                    catch {
+                        $payload = New-ScriptResult -Ok $false -Status error -Message 'Could not delete ComfyUI portable folder. Close ComfyUI if it is running, then retry.' -Details @{
+                            path      = $deploy
+                            exception = (Limit-Detail $_.Exception.Message 800)
+                        } -Errors @(
+                            [pscustomobject]@{ code = 'COMFY_DELETE_FAILED'; message = $_.Exception.Message }
+                        )
+                        Write-Output (Write-ScriptJson $payload)
+                        exit 1
+                    }
+                    $payload = New-ScriptResult -Ok $true -Status success -Message 'Removed ComfyUI portable install folder.' -Details @{ path = $deploy }
+                    Write-Output (Write-ScriptJson $payload)
+                    exit 0
+                }
+                default {
+                    $payload = New-ScriptResult -Ok $false -Status error -Message 'ComfyUI portable: only Uninstall is supported from this screen.' -Details @{ action = $Action } -Errors @(
+                        [pscustomobject]@{ code = 'COMFY_ACTION_UNSUPPORTED'; message = $Action }
+                    )
+                    Write-Output (Write-ScriptJson $payload)
+                    exit 1
                 }
             }
         }
