@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActionButton } from '../components/ActionButton'
 import { LogPanel } from '../components/LogPanel'
 import { StepCard, type StepState } from '../components/StepCard'
@@ -53,7 +53,7 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'ollama-check': 'Checking Ollama…',
   ollama: 'Installing or verifying Ollama…',
   'docker-install':
-    'Installing or verifying Docker Desktop. This often takes several minutes; approve UAC if Windows asks. Waiting for docker.exe after winget…',
+    'Installing or verifying Docker Desktop (admin). Approve UAC if it appears. winget plus waiting for docker.exe can take 5-15 minutes; the Log adds a line every ~12s while this step runs.',
   docker: 'Checking Docker engine…',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy: 'Installing or verifying ComfyUI…',
@@ -76,12 +76,30 @@ export default function InstallWizard() {
   const [messages, setMessages] = useState<string[]>(() => STEPS.map(() => 'Waiting'))
   const [log, setLog] = useState<string>('')
 
-  const appendLog = (line: string) => {
+  /** While a script is awaited, log periodic heartbeats so long steps do not look hung. */
+  const runningScriptRef = useRef<{ script: string; since: number } | null>(null)
+
+  const appendLog = useCallback((line: string) => {
     setLog((prev) => (prev ? `${prev}\n${line}` : line))
-  }
+  }, [])
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const cur = runningScriptRef.current
+      if (!cur) return
+      const sec = Math.floor((Date.now() - cur.since) / 1000)
+      if (sec < 10) return
+      setLog(
+        (prev) =>
+          `${prev || ''}\n... ${cur.script} still running (${sec}s). Elevated Docker: approve UAC, then wait for winget and file copy (often several minutes).`
+      )
+    }, 12_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const runAll = async () => {
     setLog('')
+    runningScriptRef.current = null
     for (let i = 0; i < STEPS.length; i++) {
       const step = STEPS[i]!
       setStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
@@ -92,10 +110,15 @@ export default function InstallWizard() {
           setMessages((m) => m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v)))
           continue
         }
+        runningScriptRef.current = { script: step.script, since: Date.now() }
+        appendLog(
+          `--- ${step.script} started${step.elevated ? ' [elevated - approve UAC if Windows shows it]' : ''} ---`
+        )
         const r: ScriptResult = await window.privateai.runScript(step.script, undefined, {
           elevated: step.elevated,
           timeoutMs: step.timeoutMs
         })
+        runningScriptRef.current = null
         appendLog(
           `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
         )
@@ -112,6 +135,7 @@ export default function InstallWizard() {
         )
         if (!r.ok) break
       } catch (e) {
+        runningScriptRef.current = null
         appendLog(`${step.script} threw: ${String(e)}`)
         setStates((s) => s.map((v, idx) => (idx === i ? 'error' : v)))
         setMessages((m) => m.map((v, idx) => (idx === i ? String(e) : v)))
