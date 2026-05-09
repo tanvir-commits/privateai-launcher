@@ -40,16 +40,45 @@ try {
         $portChecks[$p.name] = [pscustomobject]@{ port = $p.port; free = [bool]$free }
     }
 
+    $virtFw = $null
+    $vmMon = $null
+    try {
+        $p0 = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -ne $p0) {
+            $virtFw = $p0.VirtualizationFirmwareEnabled
+            $vmMon = $p0.VMMonitorModeExtensions
+        }
+    }
+    catch { }
+
+    $hypervisorPresent = $null
+    try {
+        $hypervisorPresent = [bool]$cs.HypervisorPresent
+    }
+    catch { }
+
     $warnings = @()
     if ($ramBytes -lt 8GB) { $warnings += 'Less than 8 GB RAM detected.' }
     if ($null -ne $diskFree -and $diskFree -lt 50GB) { $warnings += 'Less than 50 GB free on C:.' }
+    if ($virtFw -eq $false) {
+        $warnings += 'CPU firmware virtualization looks disabled (WMI). Enable Intel VT-x or AMD-V in UEFI/BIOS, then reboot. Required for Docker Desktop / WSL2.'
+    }
+    if ($vmMon -eq $false) {
+        $warnings += 'Second-level address translation (SLAT) not reported by WMI. Some CPUs need it enabled in BIOS for Hyper-V / Docker.'
+    }
+    if ($hypervisorPresent -eq $true) {
+        $warnings += 'Windows reports a hypervisor (often a VM). Enable nested virtualization for the VM, or install Docker on physical hardware.'
+    }
 
     $details = [ordered]@{
-        osCaption     = $os.Caption
-        osBuild       = $build
-        ramBytes      = $ramBytes
-        diskCFreeBytes = $diskFree
-        ports         = [pscustomobject]$portChecks
+        osCaption                       = $os.Caption
+        osBuild                         = $build
+        ramBytes                        = $ramBytes
+        diskCFreeBytes                  = $diskFree
+        ports                           = [pscustomobject]$portChecks
+        virtualizationFirmwareEnabled   = $virtFw
+        vmMonitorModeExtensions         = $vmMon
+        hypervisorPresent               = $hypervisorPresent
     }
 
     $msg = 'System scan complete.'

@@ -2,6 +2,21 @@ import { useState } from 'react'
 import { ActionButton } from '../components/ActionButton'
 import { LogPanel } from '../components/LogPanel'
 
+const GUIDES: { title: string; body: string }[] = [
+  {
+    title: 'Docker: "Virtualization support not detected"',
+    body: [
+      'Signing in to Docker does not fix this. Docker Desktop needs hardware virtualization and the right Windows features.',
+      '',
+      '1) UEFI/BIOS: Turn on Intel VT-x / AMD-V (sometimes called SVM). Save and reboot.',
+      '2) Windows features (admin PowerShell or Optional Features UI): install Virtual Machine Platform and Windows Subsystem for Linux, then reboot.',
+      '3) If this PC is a VM: enable nested virtualization for that VM in Hyper-V / VMware / VirtualBox settings.',
+      '4) Conflicts: other hypervisors (older VirtualBox/Hyper-V) or "Core isolation" / Memory integrity can block Docker; adjust and reboot.',
+      '5) After changes, open Docker Desktop again. Use Docker docs: View system requirements from the error screen.'
+    ].join('\n')
+  }
+]
+
 const COMMON: { code: string; title: string; hint: string }[] = [
   {
     code: 'OLLAMA_NOT_RUNNING',
@@ -51,6 +66,14 @@ export default function Troubleshooting() {
       <p className="page-sub">Plain-language fixes for common failures.</p>
 
       <div className="stack">
+        {GUIDES.map((g) => (
+          <div key={g.title} className="card">
+            <h3>{g.title}</h3>
+            <p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.55 }}>
+              {g.body}
+            </p>
+          </div>
+        ))}
         {COMMON.map((c) => (
           <div key={c.code} className="card">
             <h3>{c.title}</h3>
