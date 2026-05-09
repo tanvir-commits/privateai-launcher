@@ -22,11 +22,20 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+}
+
+#root {
+  height: 100%;
 }
 
 a {
@@ -36,7 +45,8 @@ a {
 .app-shell {
   display: grid;
   grid-template-columns: 220px 1fr;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
 }
 
 .sidebar {
@@ -46,6 +56,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .brand {
@@ -78,6 +90,8 @@ a {
 .content {
   padding: 28px 32px 48px;
   max-width: 1100px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .page-title {
