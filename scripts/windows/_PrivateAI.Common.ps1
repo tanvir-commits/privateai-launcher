@@ -269,6 +269,57 @@ function Stop-PrivateAIWsl {
     catch { }
 }
 
+function Start-PrivateAIDockerWindowsEngine {
+    param(
+        [switch]$SkipLaunchDesktop
+    )
+
+    $svcName = 'com.docker.service'
+    $found = $false
+    $before = ''
+    $after = ''
+    $startOk = $false
+    $errMsg = ''
+    try {
+        $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+        if ($null -ne $svc) {
+            $found = $true
+            $before = [string]$svc.Status
+            if ($svc.Status -ne 'Running') {
+                Start-Service -Name $svcName -ErrorAction Stop
+            }
+            $svc2 = Get-Service -Name $svcName
+            $after = [string]$svc2.Status
+            $startOk = ($svc2.Status -eq 'Running')
+        }
+    }
+    catch {
+        $errMsg = $_.Exception.Message
+    }
+
+    $launched = $false
+    if (-not $SkipLaunchDesktop) {
+        $exe = Get-DockerDesktopExePath
+        if ($null -ne $exe -and (Test-Path -LiteralPath $exe)) {
+            try {
+                Start-Process -FilePath $exe -ErrorAction SilentlyContinue | Out-Null
+                $launched = $true
+            }
+            catch { }
+        }
+    }
+
+    return [pscustomobject]@{
+        serviceName        = $svcName
+        serviceFound       = [bool]$found
+        statusBefore       = $before
+        statusAfter        = $after
+        serviceRunning     = [bool]$startOk
+        startError         = $errMsg
+        desktopLaunched    = [bool]$launched
+    }
+}
+
 function Update-PrivateAIWslInPlace {
     $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
     if (-not (Test-Path -LiteralPath $wsl)) {

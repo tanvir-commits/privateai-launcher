@@ -52,8 +52,15 @@ export function registerIpcHandlers(): void {
     const elevated =
       code === 'DOCKER_PROGRAMDATA_ACL' ||
       code === 'DOCKER_VIRTUALIZATION_PREREQS' ||
-      code === 'WSL_UPDATE'
-    const timeoutMs = elevated ? (code === 'WSL_UPDATE' ? 600_000 : 300_000) : 180_000
+      code === 'WSL_UPDATE' ||
+      code === 'DOCKER_ENGINE_WINDOWS'
+    const timeoutMs = elevated
+      ? code === 'WSL_UPDATE'
+        ? 600_000
+        : code === 'DOCKER_ENGINE_WINDOWS'
+          ? 120_000
+          : 300_000
+      : 180_000
     return runPowerShellScript({
       scriptName: 'repair.ps1',
       args: { Code: payload.code },

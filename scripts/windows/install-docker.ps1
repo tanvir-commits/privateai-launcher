@@ -69,9 +69,10 @@ try {
             $null = Update-PrivateAIWslInPlace
             Stop-PrivateAIWsl
             Start-Sleep -Seconds 2
-            Start-Process -FilePath $desktopExe | Out-Null
+            $dockEng = Start-PrivateAIDockerWindowsEngine
             $payload = New-ScriptResult -Ok $true -Status warning -Message 'Docker Desktop is installed; launched it, but the engine is not ready yet.' -Details @{
-                dockerExe = [string]$dockerExe
+                dockerExe     = [string]$dockerExe
+                dockerEngine  = $dockEng
             } -Warnings @('Wait for Docker Desktop to finish startup, then continue.')
             Write-Output (Write-ScriptJson $payload)
             exit 0
@@ -106,6 +107,7 @@ try {
                     $null = Update-PrivateAIWslInPlace
                     Stop-PrivateAIWsl
                     Start-Sleep -Seconds 2
+                    $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
                     $wslPreheatBeforeDesktopPoll = $true
                 }
                 Start-Process -FilePath $desktopExe -ErrorAction Stop | Out-Null
@@ -125,6 +127,7 @@ try {
                     $null = Update-PrivateAIWslInPlace
                     Stop-PrivateAIWsl
                     Start-Sleep -Seconds 2
+                    $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
                     Start-Process -FilePath $desktopFinal | Out-Null
                 }
             }

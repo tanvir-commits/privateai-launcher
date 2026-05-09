@@ -42,13 +42,34 @@ try {
         }
         catch { }
 
-        $failMsg = 'Docker is installed but the engine is not responding after WSL refresh.'
+        $dockEng = Start-PrivateAIDockerWindowsEngine
+        Start-Sleep -Seconds 8
+        try {
+            $version3 = & $dockerExe version --format '{{.Server.Version}}' 2>$null
+            if (-not [string]::IsNullOrWhiteSpace($version3)) {
+                $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker responded after starting Docker Desktop service / app.' -Details @{
+                    serverVersion = [string]$version3
+                    dockerExe     = [string]$dockerExe
+                    wslHeal       = $wslHeal
+                    dockerEngine  = $dockEng
+                } -Warnings @('We started com.docker.service and relaunched Docker Desktop; if this happens often, use Troubleshooting - Docker engine (Windows service).')
+                Write-Output (Write-ScriptJson $payload)
+                exit 0
+            }
+        }
+        catch { }
+
+        $failMsg = 'Docker is installed but the engine is not responding after WSL refresh and Windows service start.'
         if ($wslHeal.ok -and ($wslHeal.tail -match 'already')) {
-            $failMsg = 'WSL reports it is already current, but Docker still will not start the engine. Fully quit Docker from the system tray, restart Windows once, then run this check again (or open Docker Desktop after reboot).'
+            $failMsg = 'WSL looks current, but the Docker engine still will not answer. Try Troubleshooting - Docker engine (Windows service). If com.docker.service stays stopped, reinstall Docker Desktop or restart Windows once.'
+        }
+        if (-not $dockEng.serviceFound) {
+            $failMsg = 'Docker CLI is present but com.docker.service was not found (incomplete install?). Reinstall Docker Desktop from Settings - Apps or docker.com.'
         }
 
         $payload = New-ScriptResult -Ok $false -Status error -Message $failMsg -Details @{
-            wslHeal = $wslHeal
+            wslHeal      = $wslHeal
+            dockerEngine = $dockEng
         } -Errors @(
             [pscustomobject]@{ code = 'DOCKER_NOT_RUNNING'; message = [string]$firstErr }
         )

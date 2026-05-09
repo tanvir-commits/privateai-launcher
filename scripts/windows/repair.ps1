@@ -90,6 +90,25 @@ function Repair-DockerNotRunning {
     )
 }
 
+function Repair-DockerEngineWindows {
+    $eng = Start-PrivateAIDockerWindowsEngine
+    if (-not $eng.serviceFound) {
+        return New-ScriptResult -Ok $false -Status error -Message 'Docker Desktop service (com.docker.service) is not installed. Reinstall Docker Desktop.' -Details @{ dockerEngine = $eng } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_SERVICE_MISSING'; message = 'com.docker.service not found' }
+        )
+    }
+    if (-not $eng.serviceRunning) {
+        return New-ScriptResult -Ok $false -Status error -Message 'Could not start com.docker.service. See startError in details; you may need repair from Docker Desktop or a Windows restart.' -Details @{ dockerEngine = $eng } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_SERVICE_START_FAILED'; message = [string]$eng.startError }
+        )
+    }
+    $msg = 'Started Docker Desktop Windows service (com.docker.service).'
+    if ($eng.desktopLaunched) {
+        $msg = 'Started com.docker.service and launched Docker Desktop.'
+    }
+    return New-ScriptResult -Ok $true -Status success -Message $msg -Details @{ dockerEngine = $eng }
+}
+
 function Repair-OpenWebuiContainer {
     $name = 'privateai-open-webui'
     docker.exe start $name *> $null 2>&1
@@ -108,6 +127,7 @@ try {
         'WSL_UPDATE' { Repair-WslUpdate }
         'DOCKER_PROGRAMDATA_ACL' { Repair-DockerProgramDataAcl }
         'DOCKER_NOT_RUNNING' { Repair-DockerNotRunning }
+        'DOCKER_ENGINE_WINDOWS' { Repair-DockerEngineWindows }
         'OPENWEBUI_CONTAINER_STOPPED' { Repair-OpenWebuiContainer }
         'OPENWEBUI_CANNOT_REACH_OLLAMA' {
             New-ScriptResult -Ok $true -Status success -Message 'Recreate Open WebUI with OLLAMA_BASE_URL=http://host.docker.internal:11434 (re-run install-openwebui.ps1).' -Details @{

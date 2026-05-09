@@ -14,6 +14,14 @@ const GUIDES: { title: string; body: string }[] = [
       '',
       'Conflicts: Memory integrity / other hypervisors can still block Docker until adjusted.'
     ].join('\n')
+  },
+  {
+    title: 'Docker Desktop stuck at "Starting the Docker Engine"',
+    body: [
+      'Often the Windows service com.docker.service is stopped even though WSL looks fine.',
+      '',
+      'Use repair: Docker engine (Windows service) below (approve UAC), then retry Check Docker Desktop in Install Wizard.'
+    ].join('\n')
   }
 ]
 
@@ -60,6 +68,12 @@ const COMMON: { code: string; title: string; hint: string }[] = [
     title: 'WSL: update kernel (admin)',
     hint:
       'Runs wsl --update (with web download fallback). Use when Docker says WSL needs updating. Approve UAC; can take several minutes.'
+  },
+  {
+    code: 'DOCKER_ENGINE_WINDOWS',
+    title: 'Docker: engine / Windows service (admin)',
+    hint:
+      'Starts com.docker.service and relaunches Docker Desktop. Use when the UI spins on "Starting the Docker Engine" or check-docker fails after WSL is OK. Approve UAC.'
   }
 ]
 
