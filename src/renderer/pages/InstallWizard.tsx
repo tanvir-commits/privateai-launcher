@@ -56,7 +56,12 @@ const CORE_STEPS: WizardStep[] = [
   { id: 'system', title: 'Check system', script: 'check-system.ps1' },
   { id: 'gpu', title: 'Check GPU', script: 'check-gpu.ps1' },
   { id: 'ollama-check', title: 'Check Ollama', script: 'check-ollama.ps1' },
-  { id: 'ollama', title: 'Install / verify Ollama', script: 'install-ollama.ps1' },
+  {
+    id: 'ollama',
+    title: 'Install / verify Ollama',
+    script: 'install-ollama.ps1',
+    timeoutMs: 900_000
+  },
   {
     id: 'docker-install',
     title: 'Install / verify Docker Desktop (admin)',
@@ -69,7 +74,7 @@ const CORE_STEPS: WizardStep[] = [
     title: 'Check Docker Desktop',
     script: 'check-docker.ps1',
     elevated: true,
-    timeoutMs: 180_000
+    timeoutMs: 1_800_000
   },
   { id: 'openwebui', title: 'Install / verify Open WebUI', script: 'install-openwebui.ps1' },
   {
@@ -111,10 +116,12 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   gpu: 'Checking GPU and drivers…',
   'ollama-check':
     'Checking Ollama. If it is installed but idle, PrivateAI tries to wake it automatically (up to ~90s)…',
-  ollama: 'Installing or verifying Ollama…',
+  ollama:
+    'Installing Ollama with winget when missing (downloads can take several minutes), then waiting for the API…',
   'docker-install':
     'Installing or verifying Docker Desktop (admin). If the engine already runs, this step finishes quickly; otherwise DISM/WSL/winget/ACL work can take 5–15+ minutes. Approve UAC. If Docker Desktop opens, finish any update or onboarding there first. Log lines every ~12s.',
-  docker: 'Checking Docker engine…',
+  docker:
+    'Checking the Docker engine (admin). First Docker Desktop launch often needs you to click through onboarding (e.g. skip sign-in); WSL updates can add several minutes. This step can run a long time.',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy:
     'Checking if ComfyUI answers on localhost after install. Open WebUI only uses images if you connect an image backend in its admin.',
@@ -205,8 +212,20 @@ export default function InstallWizard() {
       if (!r.ok && r.errors.length > 0) {
         appendLog(`errors: ${JSON.stringify(r.errors).slice(0, 4000)}`)
       }
-      const nextState: StepState = r.ok ? (r.warnings.length ? 'warning' : 'success') : 'error'
-      return { message: r.message, state: nextState }
+      const wizardOllamaMissingOnly =
+        step.id === 'ollama-check' &&
+        !r.ok &&
+        r.errors.length > 0 &&
+        r.errors.every((e) => e.code === 'OLLAMA_NOT_FOUND')
+
+      let nextState: StepState = r.ok ? (r.warnings.length ? 'warning' : 'success') : 'error'
+      let message = r.message
+      if (wizardOllamaMissingOnly) {
+        nextState = 'success'
+        message =
+          'Ollama is not installed yet (expected on a fresh machine). The next step installs it automatically.'
+      }
+      return { message, state: nextState }
     },
     [appendLog]
   )
@@ -251,7 +270,11 @@ export default function InstallWizard() {
           typeof r.details === 'object' &&
           r.details !== null &&
           (r.details as Record<string, unknown>).rebootRequired === true
-        if (!r.ok || rebootPause) break
+        const precheckAllowsNextInstaller =
+          !r.ok &&
+          step.id === 'ollama-check' &&
+          r.errors.some((err) => err.code === 'OLLAMA_NOT_FOUND')
+        if ((!r.ok && !precheckAllowsNextInstaller) || rebootPause) break
       } catch (e) {
         runningScriptRef.current = null
         appendLog(`${step.script} threw: ${String(e)}`)
