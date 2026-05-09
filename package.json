@@ -1,0 +1,41 @@
+{
+  "name": "privateai-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PrivateAI Launcher — Windows control panel for local Ollama, Open WebUI, and ComfyUI",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ps": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/_run-all-smoke.ps1",
+    "test:all": "npm run typecheck && npm run test && npm run test:ps",
+    "go": "node scripts/task.mjs",
+    "go:dev": "node scripts/task.mjs dev",
+    "go:test": "node scripts/task.mjs test:all"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "happy-dom": "^15.11.6",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.6"
+  }
+}

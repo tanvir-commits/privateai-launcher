@@ -1,0 +1,37 @@
+{
+  "appId": "com.privateai.launcher",
+  "productName": "PrivateAI Launcher",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "scripts/**/*",
+    "config/**/*",
+    "workflows/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "scripts/windows",
+      "to": "scripts/windows",
+      "filter": ["**/*.ps1"]
+    },
+    {
+      "from": "config",
+      "to": "config"
+    },
+    {
+      "from": "workflows",
+      "to": "workflows"
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "artifactName": "${productName}-${version}-Setup.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PrivateAI: Dev (no npm.ps1)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/task.mjs", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:Path}"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PrivateAI: Test all",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/task.mjs", "test:all"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:Path}"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

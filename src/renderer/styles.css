@@ -1,0 +1,388 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0f14;
+  --surface: #121922;
+  --surface-2: #1a222d;
+  --border: #2a3544;
+  --text: #e8eef5;
+  --muted: #9aa8b8;
+  --accent: #3ddc84;
+  --warn: #e6b84d;
+  --danger: #f07178;
+  --radius: 12px;
+  font-family:
+    'Segoe UI Variable',
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+.nav-link {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.nav-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-link.active {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.content {
+  padding: 28px 32px 48px;
+  max-width: 1100px;
+}
+
+.page-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.page-sub {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.grid.cols-2 {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: #3b4a5e;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1f6f4b, #2a8f63);
+  border-color: #2f9a6c;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.ok {
+  background: var(--accent);
+}
+
+.dot.warn {
+  background: var(--warn);
+}
+
+.dot.bad {
+  background: var(--danger);
+}
+
+.dot.unknown {
+  background: #5c6a7d;
+}
+
+.log-panel {
+  margin-top: 12px;
+  background: #070a0e;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #c9d4e3;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.step-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* Hardware Doctor */
+.hw-layout {
+  margin-top: 20px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.hw-card-wide {
+  grid-column: 1 / -1;
+}
+
+.hw-card-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hw-readiness {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.hw-readiness-tier {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.hw-readiness .hw-readiness-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.hw-readiness.ok .hw-readiness-dot {
+  background: var(--accent);
+}
+
+.hw-readiness.warn .hw-readiness-dot {
+  background: var(--warn);
+}
+
+.hw-readiness.bad .hw-readiness-dot {
+  background: var(--danger);
+}
+
+.hw-readiness.unknown .hw-readiness-dot {
+  background: #5c6a7d;
+}
+
+.hw-dl {
+  margin: 0;
+}
+
+.hw-dl-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.hw-dl-row:last-child {
+  border-bottom: none;
+}
+
+.hw-dl dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.hw-dl dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.hw-vram-sub {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.hw-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+}
+
+.hw-warnings {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.hw-ports {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hw-port-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.hw-port-name {
+  font-weight: 600;
+}
+
+.hw-port-status {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.hw-port-status.free {
+  color: var(--accent);
+}
+
+.hw-port-status.busy {
+  color: var(--warn);
+}
+
+.hw-raw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.hw-raw-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.hw-alert-error {
+  border-color: #5c2a2e;
+  background: linear-gradient(135deg, #1a1214 0%, var(--surface) 100%);
+}

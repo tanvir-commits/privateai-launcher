@@ -1,0 +1,25 @@
+{
+  "profiles": [
+    {
+      "id": "text-7b",
+      "label": "Text chat (starter)",
+      "description": "General local chat through Ollama.",
+      "ollamaPull": "qwen2.5:7b",
+      "approxSizeGb": 4.5
+    },
+    {
+      "id": "vision-7b",
+      "label": "Vision / image understanding",
+      "description": "Image feedback in chat when VRAM allows.",
+      "ollamaPull": "qwen2.5vl:7b",
+      "approxSizeGb": 6
+    },
+    {
+      "id": "image-flux",
+      "label": "Image generation (FLUX Schnell FP8)",
+      "description": "ComfyUI workflow + checkpoints managed outside Ollama.",
+      "ollamaPull": null,
+      "approxSizeGb": 12
+    }
+  ]
+}

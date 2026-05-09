@@ -1,0 +1,4 @@
+{
+  "minimumRamBytes": 8589934592,
+  "notes": "8 GB RAM minimum for v0.1 basic tier; see spec readiness tiers."
+}
