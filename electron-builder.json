@@ -29,7 +29,8 @@
   "win": {
     "target": ["nsis"],
     "artifactName": "${productName}-${version}-Setup.${ext}",
-    "sign": null
+    "forceCodeSigning": false,
+    "signAndEditExecutable": false
   },
   "nsis": {
     "oneClick": false,
