@@ -48,7 +48,7 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('repair:run', async (_e, payload: { code: string }) => {
-    const code = payload.code.toUpperInvariant()
+    const code = payload.code.toUpperCase()
     const elevated =
       code === 'DOCKER_PROGRAMDATA_ACL' ||
       code === 'DOCKER_VIRTUALIZATION_PREREQS' ||

@@ -51,6 +51,14 @@ function testPsRun() {
   ).status ?? 1
 }
 
+function verifyScriptsParse() {
+  return spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'scripts/windows/_verify-scripts-parse.ps1')],
+    { cwd: root, stdio: 'inherit' }
+  ).status ?? 1
+}
+
 function vitest() {
   die(vitestRun())
 }
@@ -61,6 +69,7 @@ function testPs() {
 
 function testAll() {
   typecheck()
+  if (verifyScriptsParse() !== 0) die(1)
   if (vitestRun() !== 0) die(1)
   die(testPsRun())
 }
@@ -87,11 +96,16 @@ switch (name) {
   case 'test:ps':
     testPs()
     break
+  case 'verify-ps-parse':
+    die(verifyScriptsParse())
+    break
   case 'test:all':
     testAll()
     break
   default:
     console.error(`Unknown task: ${name ?? '(none)'}`)
-    console.error('Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|test:ps|test:all>')
+    console.error(
+      'Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|verify-ps-parse|test:ps|test:all>'
+    )
     die(1)
 }
