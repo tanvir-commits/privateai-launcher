@@ -243,12 +243,13 @@ a {
 .step-progress::after {
   content: '';
   position: absolute;
-  left: -35%;
-  width: 35%;
+  left: -30%;
+  width: 30%;
   height: 100%;
   border-radius: 2px;
   background: var(--accent);
-  animation: step-progress-slide 1.15s ease-in-out infinite;
+  animation: step-progress-slide 2.75s linear infinite;
+  opacity: 0.85;
 }
 
 @keyframes step-progress-slide {
@@ -256,7 +257,7 @@ a {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(380%);
+    transform: translateX(430%);
   }
 }
 

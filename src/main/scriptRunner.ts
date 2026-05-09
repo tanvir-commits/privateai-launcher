@@ -125,15 +125,17 @@ async function runPowerShellScriptElevated(input: {
 
   const innerScript = [
     '$ErrorActionPreference = "Continue"',
+    '$utf8NoBom = New-Object System.Text.UTF8Encoding $false',
     'try {',
     `  $output = ${invokeLine} 2>&1 | ForEach-Object { $_.ToString() }`,
-    `  $output -join [Environment]::NewLine | Set-Content -LiteralPath '${escapePsSingleQuoted(outFile)}' -Encoding utf8`,
+    '  $joined = if ($null -eq $output) { \'\' } elseif ($output -is [System.Array]) { $output -join [Environment]::NewLine } else { [string]$output }',
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(outFile)}', $joined, $utf8NoBom)`,
     '  $ec = $LASTEXITCODE',
     '  if ($null -eq $ec) { $ec = 0 }',
-    `  Set-Content -LiteralPath '${escapePsSingleQuoted(innerExitFile)}' -Value $ec`,
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(innerExitFile)}', "$ec", $utf8NoBom)`,
     '} catch {',
-    `  $_ | Out-String | Set-Content -LiteralPath '${escapePsSingleQuoted(errFile)}' -Encoding utf8`,
-    `  Set-Content -LiteralPath '${escapePsSingleQuoted(innerExitFile)}' -Value 1`,
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(errFile)}', ($_ | Out-String), $utf8NoBom)`,
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(innerExitFile)}', '1', $utf8NoBom)`,
     '}'
   ].join('\r\n')
 
@@ -290,7 +292,8 @@ function buildScriptInvokeExpression(
 
 async function readTextSafe(path: string): Promise<string> {
   try {
-    return await fs.readFile(path, 'utf8')
+    const s = await fs.readFile(path, 'utf8')
+    return s.replace(/^\uFEFF/, '')
   } catch {
     return ''
   }

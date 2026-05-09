@@ -6,8 +6,17 @@ import { isScriptResult, type ScriptResult } from './scriptContract'
  * or only JSON. Leading non-JSON lines (e.g. profile noise) are ignored.
  */
 export function parseScriptStdoutToResult(stdout: string): ScriptResult | null {
-  const text = stdout.trim()
+  const text = stdout.replace(/^\uFEFF/, '').trim()
   if (!text) return null
+
+  try {
+    const whole: unknown = JSON.parse(text)
+    if (isScriptResult(whole)) {
+      return whole as ScriptResult
+    }
+  } catch {
+    // Multi-line stdout or leading noise — try balanced braces below.
+  }
 
   const candidates = collectJsonCandidates(text)
   for (const chunk of candidates) {
