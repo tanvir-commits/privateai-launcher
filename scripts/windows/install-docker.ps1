@@ -102,10 +102,6 @@ try {
 
         $desktopExe = Get-DockerDesktopExePath
         if ($null -ne $desktopExe -and (Test-Path -LiteralPath $desktopExe)) {
-            # Docker may still show "WSL needs updating" until kernel is refreshed; run update again then shut down WSL before launch.
-            $null = Update-PrivateAIWslInPlace
-            Stop-PrivateAIWsl
-            Start-Sleep -Seconds 2
             $dockEng = Start-PrivateAIDockerWindowsEngine
             $payload = New-ScriptResult -Ok $true -Status warning -Message 'Docker Desktop is installed; launched it, but the engine is not ready yet.' -Details @{
                 dockerExe     = [string]$dockerExe
@@ -137,7 +133,7 @@ try {
     $heavyStart = Get-Date
     $dockerExe = $null
     $launchedDesktop = $false
-    $wslPreheatBeforeDesktopPoll = $false
+    $enginePrimedBeforeDesktopPoll = $false
     while ($null -eq $dockerExe -and (Get-Date) -lt $deadline) {
         $dockerExe = Get-DockerExecutablePath
         if ($null -ne $dockerExe) { break }
@@ -145,12 +141,9 @@ try {
         $desktopExe = Get-DockerDesktopExePath
         if (-not $launchedDesktop -and $null -ne $desktopExe -and (Test-Path -LiteralPath $desktopExe)) {
             try {
-                if (-not $wslPreheatBeforeDesktopPoll) {
-                    $null = Update-PrivateAIWslInPlace
-                    Stop-PrivateAIWsl
-                    Start-Sleep -Seconds 2
+                if (-not $enginePrimedBeforeDesktopPoll) {
                     $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
-                    $wslPreheatBeforeDesktopPoll = $true
+                    $enginePrimedBeforeDesktopPoll = $true
                 }
                 Set-PrivateAIDockerDesktopQuietUiHints
                 Start-Process -FilePath $desktopExe -WindowStyle Minimized -ErrorAction Stop | Out-Null
@@ -175,9 +168,6 @@ try {
         if ($null -ne $desktopFinal -and (Test-Path -LiteralPath $desktopFinal)) {
             try {
                 if (-not $launchedDesktop) {
-                    $null = Update-PrivateAIWslInPlace
-                    Stop-PrivateAIWsl
-                    Start-Sleep -Seconds 2
                     $null = Start-PrivateAIDockerWindowsEngine -SkipLaunchDesktop
                     Set-PrivateAIDockerDesktopQuietUiHints
                     Start-Process -FilePath $desktopFinal -WindowStyle Minimized | Out-Null
