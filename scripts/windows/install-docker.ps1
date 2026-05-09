@@ -1,6 +1,21 @@
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
+    # Run first while elevated: wrong ownership here blocks Docker (blue banner in admin console).
+    $aclFix = Repair-DockerProgramDataFolder
+    if (-not $aclFix.ok) {
+        $payload = New-ScriptResult -Ok $false -Status error -Message 'Could not repair ownership on ProgramData\DockerDesktop. Use Troubleshooting - Docker ProgramData ACL (admin), or remove that folder after uninstall, then retry.' -Details @{
+            aclRepair = $aclFix
+        } -Errors @(
+            [pscustomobject]@{
+                code    = 'DOCKER_PROGRAMDATA_ACL_FAILED'
+                message = $(if ($aclFix.detail) { [string]$aclFix.detail } else { 'takeown or icacls returned non-zero; see details.aclRepair' })
+            }
+        )
+        Write-Output (Write-ScriptJson $payload)
+        exit 1
+    }
+
     $dockerExe = Get-DockerExecutablePath
     if ($null -ne $dockerExe) {
         try {

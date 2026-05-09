@@ -48,10 +48,13 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('repair:run', async (_e, payload: { code: string }) => {
+    const code = payload.code.toUpperInvariant()
+    const elevated = code === 'DOCKER_PROGRAMDATA_ACL'
     return runPowerShellScript({
       scriptName: 'repair.ps1',
       args: { Code: payload.code },
-      timeoutMs: 180_000
+      timeoutMs: elevated ? 300_000 : 180_000,
+      elevated
     })
   })
 

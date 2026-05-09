@@ -146,3 +146,47 @@ function Get-DockerExecutablePath {
     }
     return $null
 }
+
+<#
+    Docker Desktop fails with "ProgramData\DockerDesktop must be owned by an elevated account"
+    when the folder exists with wrong ownership. Call from an elevated session before install.
+#>
+function Repair-DockerProgramDataFolder {
+    $folder = Join-Path $env:ProgramData 'DockerDesktop'
+    if (-not (Test-Path -LiteralPath $folder)) {
+        return [pscustomobject]@{
+            ok     = $true
+            action = 'skipped'
+            detail = 'DockerDesktop folder not present under ProgramData.'
+        }
+    }
+
+    $takeownExe = Join-Path $env:SystemRoot 'System32\takeown.exe'
+    $icaclsExe = Join-Path $env:SystemRoot 'System32\icacls.exe'
+    if (-not (Test-Path -LiteralPath $takeownExe) -or -not (Test-Path -LiteralPath $icaclsExe)) {
+        return [pscustomobject]@{
+            ok     = $false
+            action = 'error'
+            detail = 'takeown.exe or icacls.exe not found under SystemRoot.'
+        }
+    }
+
+    $p1 = Start-Process -FilePath $takeownExe -ArgumentList @('/F', $folder, '/A', '/R', '/D', 'Y') -Wait -PassThru -NoNewWindow
+    $p2 = Start-Process -FilePath $icaclsExe -ArgumentList @($folder, '/grant:r', 'Administrators:(OI)(CI)F', '/T') -Wait -PassThru -NoNewWindow
+    $p3 = Start-Process -FilePath $icaclsExe -ArgumentList @($folder, '/grant:r', 'SYSTEM:(OI)(CI)F', '/T') -Wait -PassThru -NoNewWindow
+
+    $t1 = if ($null -ne $p1.ExitCode) { [int]$p1.ExitCode } else { -1 }
+    $t2 = if ($null -ne $p2.ExitCode) { [int]$p2.ExitCode } else { -1 }
+    $t3 = if ($null -ne $p3.ExitCode) { [int]$p3.ExitCode } else { -1 }
+
+    $ok = ($t1 -eq 0) -and ($t2 -eq 0) -and ($t3 -eq 0)
+    return [pscustomobject]@{
+        ok            = [bool]$ok
+        action        = 'repaired'
+        takeownExit   = $t1
+        icaclsAdmExit = $t2
+        icaclsSysExit = $t3
+        folder        = [string]$folder
+    }
+}
+

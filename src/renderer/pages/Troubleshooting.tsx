@@ -27,6 +27,12 @@ const COMMON: { code: string; title: string; hint: string }[] = [
     code: 'PORT_BUSY',
     title: 'Port busy',
     hint: 'Repairs identify the owning process (no auto-kill).'
+  },
+  {
+    code: 'DOCKER_PROGRAMDATA_ACL',
+    title: 'Docker: ProgramData folder ownership (admin)',
+    hint:
+      'If Docker says "ProgramData\\DockerDesktop must be owned by an elevated account", this runs takeown/icacls on that folder. Approve UAC.'
   }
 ]
 

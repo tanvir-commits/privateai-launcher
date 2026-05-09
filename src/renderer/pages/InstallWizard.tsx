@@ -53,7 +53,7 @@ const RUNNING_MESSAGE: Partial<Record<string, string>> = {
   'ollama-check': 'Checking Ollama…',
   ollama: 'Installing or verifying Ollama…',
   'docker-install':
-    'Installing or verifying Docker Desktop (admin). Approve UAC if it appears. winget plus waiting for docker.exe can take 5-15 minutes; the Log adds a line every ~12s while this step runs.',
+    'Installing or verifying Docker Desktop (admin). Fixes Docker ProgramData folder ownership first if needed. Approve UAC. winget plus waiting for docker.exe can take 5-15 minutes; the Log adds a line every ~12s.',
   docker: 'Checking Docker engine…',
   openwebui: 'Installing or verifying Open WebUI…',
   comfy: 'Installing or verifying ComfyUI…',

@@ -24,6 +24,19 @@ function Repair-OllamaNotRunning {
     return New-ScriptResult -Ok $true -Status success -Message 'Attempted to start Ollama service/process.' -Details @{ code = 'OLLAMA_NOT_RUNNING' }
 }
 
+function Repair-DockerProgramDataAcl {
+    $r = Repair-DockerProgramDataFolder
+    if ($r.action -eq 'skipped') {
+        return New-ScriptResult -Ok $true -Status success -Message 'ProgramData\DockerDesktop is not present; nothing to repair.' -Details @{ result = $r }
+    }
+    if (-not $r.ok) {
+        return New-ScriptResult -Ok $false -Status error -Message 'takeown/icacls failed on ProgramData\DockerDesktop. Run this repair from an elevated (admin) session.' -Details @{ result = $r } -Errors @(
+            [pscustomobject]@{ code = 'DOCKER_PROGRAMDATA_ACL_FAILED'; message = 'ACL repair failed' }
+        )
+    }
+    return New-ScriptResult -Ok $true -Status success -Message 'Adjusted ownership and ACLs on ProgramData\DockerDesktop. Retry Docker Desktop install or start Docker Desktop.' -Details @{ result = $r }
+}
+
 function Repair-DockerNotRunning {
     $dockerPath = "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe"
     if (Test-Path $dockerPath) {
@@ -49,6 +62,7 @@ function Repair-OpenWebuiContainer {
 try {
     $result = switch ($Code.ToUpperInvariant()) {
         'OLLAMA_NOT_RUNNING' { Repair-OllamaNotRunning }
+        'DOCKER_PROGRAMDATA_ACL' { Repair-DockerProgramDataAcl }
         'DOCKER_NOT_RUNNING' { Repair-DockerNotRunning }
         'OPENWEBUI_CONTAINER_STOPPED' { Repair-OpenWebuiContainer }
         'OPENWEBUI_CANNOT_REACH_OLLAMA' {
