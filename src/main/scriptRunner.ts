@@ -29,11 +29,17 @@ function buildPsArgs(scriptPath: string, args?: Record<string, string | number |
   return out
 }
 
+/** Scripts that only use user-session tools (Docker CLI, etc.); elevation adds UAC and can hang JSON relay. */
+const NEVER_ELEVATE_SCRIPT_NAMES = new Set(['check-docker.ps1', 'probe-docker-engine.ps1'])
+
 /**
  * Runs a launcher PowerShell script and parses its JSON stdout into {@link ScriptResult}.
  */
 export function runPowerShellScript(options: RunScriptOptions): Promise<ScriptResult> {
-  const { scriptName, args, timeoutMs = 120_000, elevated = false } = options
+  let { scriptName, args, timeoutMs = 120_000, elevated = false } = options
+  if (NEVER_ELEVATE_SCRIPT_NAMES.has(scriptName) && elevated) {
+    elevated = false
+  }
   const dir = getWindowsScriptsDir()
   const scriptPath = join(dir, scriptName)
   if (elevated) {
