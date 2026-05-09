@@ -3,104 +3,388 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#070a0e" />
+    <meta name="description" content="Download PrivateAI Launcher for Windows — portable zip or installer." />
     <title>Download — PrivateAI Launcher</title>
     <style>
       :root {
         color-scheme: dark;
-        --bg: #0b0f14;
-        --surface: #121922;
-        --border: #2a3544;
+        --bg0: #070a0e;
+        --bg1: #0b0f14;
+        --surface: rgba(18, 25, 34, 0.72);
+        --surface-solid: #121922;
+        --border: rgba(42, 53, 68, 0.85);
         --text: #e8eef5;
-        --muted: #9aa8b8;
+        --muted: #8b9aad;
         --accent: #3ddc84;
+        --accent-dim: #2bb86a;
+        --glow: rgba(61, 220, 132, 0.12);
+        --danger: #f07178;
+        --radius: 16px;
+        --font: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
       }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
-        font-family: 'Segoe UI', system-ui, sans-serif;
-        background: var(--bg);
+        min-height: 100vh;
+        font-family: var(--font);
         color: var(--text);
-        line-height: 1.5;
-        padding: 32px 20px 48px;
-        max-width: 640px;
-        margin-left: auto;
-        margin-right: auto;
+        line-height: 1.55;
+        background: var(--bg0);
+        background-image:
+          radial-gradient(ellipse 120% 80% at 50% -30%, var(--glow), transparent 55%),
+          radial-gradient(ellipse 70% 50% at 100% 0%, rgba(61, 140, 220, 0.06), transparent 45%),
+          linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 45%);
       }
+
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 22px 64px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 40px;
+        animation: rise 0.7s ease-out both;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .logo {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 20px;
+        border-radius: 14px;
+        background: linear-gradient(145deg, var(--surface-solid), #1a2633);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+
+      .logo svg {
+        width: 30px;
+        height: 30px;
+      }
+
       h1 {
-        font-size: 1.5rem;
-        margin: 0 0 8px;
+        font-size: clamp(1.65rem, 4vw, 2rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 0 0 10px;
       }
-      .muted {
+
+      .tagline {
         color: var(--muted);
-        font-size: 0.95rem;
-        margin: 0 0 24px;
+        font-size: 1.05rem;
+        max-width: 34ch;
+        margin: 0 auto;
       }
+
       .card {
         background: var(--surface);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 18px 20px;
-        margin-bottom: 16px;
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        animation: rise 0.65s ease-out both;
       }
+
+      .card:nth-of-type(1) {
+        animation-delay: 0.08s;
+      }
+      .card:nth-of-type(2) {
+        animation-delay: 0.14s;
+      }
+      .card:nth-of-type(3) {
+        animation-delay: 0.2s;
+      }
+
       .card h2 {
-        font-size: 1rem;
-        margin: 0 0 12px;
-      }
-      a.btn {
-        display: inline-block;
-        background: var(--accent);
-        color: #0b0f14;
-        text-decoration: none;
-        font-weight: 600;
-        padding: 10px 16px;
-        border-radius: 8px;
-        margin-right: 8px;
-        margin-bottom: 8px;
-      }
-      a.btn.secondary {
-        background: transparent;
-        color: var(--accent);
-        border: 1px solid var(--accent);
-      }
-      ul {
-        margin: 0;
-        padding-left: 1.2rem;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
         color: var(--muted);
+        margin: 0 0 14px;
+        font-weight: 600;
+      }
+
+      .skeleton {
+        height: 14px;
+        border-radius: 6px;
+        background: linear-gradient(90deg, var(--surface-solid) 0%, #1c2838 50%, var(--surface-solid) 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s ease-in-out infinite;
+        margin-bottom: 10px;
+      }
+
+      .skeleton.short {
+        width: 55%;
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 100% 0;
+        }
+        100% {
+          background-position: -100% 0;
+        }
+      }
+
+      .release-meta {
         font-size: 0.9rem;
+        color: var(--muted);
+        margin: 0 0 18px;
       }
-      li {
-        margin-bottom: 6px;
+
+      .release-meta strong {
+        color: var(--text);
+        font-weight: 600;
       }
-      .err {
-        color: #f07178;
+
+      .asset-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 16px;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(42, 53, 68, 0.5);
+      }
+
+      .asset-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .asset-row:first-of-type {
+        padding-top: 0;
+      }
+
+      .asset-info {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .asset-icon {
+        flex-shrink: 0;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: rgba(61, 220, 132, 0.08);
+        border: 1px solid rgba(61, 220, 132, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .asset-icon.installer {
+        background: rgba(100, 160, 255, 0.08);
+        border-color: rgba(100, 160, 255, 0.22);
+      }
+
+      .asset-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        word-break: break-word;
+      }
+
+      .asset-sub {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      a.download-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+        color: #041208;
+        text-decoration: none;
+        font-weight: 700;
         font-size: 0.9rem;
+        padding: 11px 18px;
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 4px 16px rgba(61, 220, 132, 0.25);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        white-space: nowrap;
       }
+
+      a.download-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 22px rgba(61, 220, 132, 0.32);
+      }
+
+      a.download-btn:active {
+        transform: translateY(0);
+      }
+
+      a.ghost-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.88rem;
+        font-weight: 600;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+
+      a.ghost-btn:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(138, 154, 173, 0.45);
+      }
+
+      ul.steps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+
+      ul.steps li {
+        position: relative;
+        padding-left: 44px;
+        margin-bottom: 16px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      ul.steps li:last-child {
+        margin-bottom: 0;
+      }
+
+      ul.steps li::before {
+        counter-increment: step;
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--surface-solid);
+        border: 1px solid var(--border);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       code {
-        font-size: 0.85em;
-        background: #1a222d;
-        padding: 2px 6px;
-        border-radius: 4px;
+        font-size: 0.86em;
+        background: rgba(0, 0, 0, 0.35);
+        padding: 2px 7px;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .err {
+        color: var(--danger);
+        font-size: 0.92rem;
+      }
+
+      footer {
+        text-align: center;
+        margin-top: 36px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        animation: rise 0.7s 0.25s ease-out both;
+      }
+
+      footer a {
+        color: var(--accent);
       }
     </style>
   </head>
   <body>
-    <h1>PrivateAI Launcher</h1>
-    <p class="muted">Windows downloads (latest GitHub Release).</p>
-    <div id="status" class="card"><p class="muted" style="margin: 0">Loading latest release…</p></div>
-    <div class="card">
-      <h2>How to run the zip (portable)</h2>
-      <ul>
-        <li>Download <code>*-windows-portable.zip</code> from the list below or from Releases.</li>
-        <li>Extract the whole folder (Windows: right-click → Extract All…).</li>
-        <li>Open the extracted folder and run <code>PrivateAI Launcher.exe</code>.</li>
-        <li>If SmartScreen appears, choose “More info” → “Run anyway” (unsigned builds).</li>
-      </ul>
+    <div class="wrap">
+      <header>
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M8 22c0-6 3-10 8-12 5 2 8 6 8 12M12 10c2-2 6-2 8 0"
+              stroke="#3ddc84"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="16" cy="24" r="3" fill="#3ddc84" opacity="0.9" />
+          </svg>
+        </div>
+        <h1>PrivateAI Launcher</h1>
+        <p class="tagline">Windows downloads — run Ollama, Open WebUI, and Comfy locally.</p>
+      </header>
+
+      <div id="status" class="card" aria-live="polite">
+        <h2>Latest release</h2>
+        <div class="skeleton"></div>
+        <div class="skeleton short"></div>
+        <div class="skeleton" style="margin-top: 18px"></div>
+      </div>
+
+      <div class="card">
+        <h2>Portable zip</h2>
+        <ul class="steps">
+          <li>Download <code>PrivateAI-Launcher-*-windows-portable.zip</code> below.</li>
+          <li>Extract the folder (right-click → <strong>Extract All…</strong>).</li>
+          <li>Run <code>PrivateAI Launcher.exe</code> inside that folder.</li>
+          <li>If Windows SmartScreen warns, use <strong>More info</strong> → <strong>Run anyway</strong> (unsigned builds).</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Repository</h2>
+        <p style="margin: 0; color: var(--muted); font-size: 0.92rem">
+          Source and full release history on GitHub.
+        </p>
+        <a
+          class="ghost-btn"
+          href="https://github.com/tanvir-commits/privateai-launcher/releases/latest"
+          style="margin-top: 14px"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+            />
+          </svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <footer>
+        <a href="https://github.com/tanvir-commits/privateai-launcher">tanvir-commits/privateai-launcher</a>
+      </footer>
     </div>
-    <p class="muted" style="font-size: 0.85rem">
-      Official releases:
-      <a href="https://github.com/tanvir-commits/privateai-launcher/releases/latest" style="color: var(--accent)"
-        >github.com/…/releases/latest</a
-      >
-    </p>
+
     <script>
       ;(function () {
         const REPO = 'tanvir-commits/privateai-launcher'
@@ -111,46 +395,75 @@
           return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
         }
 
+        function iconZip() {
+          return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" stroke-width="2" aria-hidden="true"><path d="M10 8h4V6h-4z"/><path d="M6 4h12v16H6z"/><path d="M10 12h4M10 16h4"/></svg>'
+        }
+        function iconSetup() {
+          return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7eb8ff" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/></svg>'
+        }
+
         fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
           .then(function (r) {
+            if (r.status === 404) throw new Error('No releases published yet')
             if (!r.ok) throw new Error('GitHub API ' + r.status)
             return r.json()
           })
           .then(function (rel) {
-            const assets = (rel.assets || []).filter(function (a) {
+            let assets = (rel.assets || []).filter(function (a) {
               return /\.(zip|exe)$/i.test(a.name)
             })
-            let html = '<h2 style="margin:0 0 12px;font-size:1rem">Latest: ' + esc(rel.tag_name || '') + '</h2>'
+            assets.sort(function (a, b) {
+              var ap = a.name.toLowerCase().indexOf('portable') !== -1 ? 0 : 1
+              var bp = b.name.toLowerCase().indexOf('portable') !== -1 ? 0 : 1
+              return ap - bp
+            })
+            var pub = rel.published_at ? new Date(rel.published_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : ''
+
+            var html = '<h2>Latest release</h2>'
+            html += '<p class="release-meta"><strong>' + esc(rel.tag_name || '') + '</strong>'
+            if (rel.name && rel.name !== rel.tag_name) html += ' · ' + esc(rel.name)
+            if (pub) html += ' · ' + esc(pub)
+            html += '</p>'
+
             if (!assets.length) {
               html +=
-                '<p class="muted" style="margin:0">No .zip or .exe assets on this release yet. Open the release on GitHub and wait for CI, or use the link below.</p>'
+                '<p class="release-meta" style="margin:0">No portable zip or installer is attached to this release yet. Run the <strong>Release Windows</strong> workflow or push a version tag, then refresh.</p>'
             } else {
-              html += '<p class="muted" style="margin:0 0 12px;font-size:0.9rem">' + esc(rel.name || '') + '</p>'
               assets.forEach(function (a) {
-                const label = a.name.indexOf('portable') !== -1 ? 'Portable (zip)' : a.name.indexOf('Setup') !== -1 ? 'Installer' : esc(a.name)
+                var low = a.name.toLowerCase()
+                var isPortable = low.indexOf('portable') !== -1
+                var isSetup = low.indexOf('setup') !== -1
+                var label = isPortable ? 'Portable (zip)' : isSetup ? 'Windows installer' : esc(a.name)
+                var mb = (a.size / (1024 * 1024)).toFixed(1) + ' MB'
+                var iconClass = isPortable ? '' : ' installer'
+                var svg = isPortable ? iconZip() : isSetup ? iconSetup() : iconZip()
+                html += '<div class="asset-row">'
+                html += '<div class="asset-info">'
+                html += '<div class="asset-icon' + iconClass + '">' + svg + '</div>'
+                html += '<div style="min-width:0">'
+                html += '<div class="asset-name">' + esc(label) + '</div>'
+                html += '<div class="asset-sub">' + esc(a.name) + ' · ' + esc(mb) + '</div>'
+                html += '</div></div>'
                 html +=
-                  '<p style="margin:0 0 10px"><a class="btn" href="' +
+                  '<a class="download-btn" href="' +
                   esc(a.browser_download_url) +
-                  '">' +
-                  esc(label) +
-                  '</a> <span class="muted">' +
-                  esc((a.size / (1024 * 1024)).toFixed(1) + ' MB') +
-                  '</span></p>'
+                  '" download rel="noopener">Download</a>'
+                html += '</div>'
               })
             }
             html +=
-              '<p style="margin:16px 0 0"><a class="btn secondary" href="' +
+              '<a class="ghost-btn" href="' +
               esc(latestUrl) +
-              '">All files on GitHub</a></p>'
+              '"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>All release files</a>'
             statusEl.innerHTML = html
           })
           .catch(function (e) {
             statusEl.innerHTML =
-              '<p class="err">Could not load release list (' +
+              '<h2>Latest release</h2><p class="err">' +
               esc(e.message) +
-              ').</p><p><a class="btn" href="' +
+              '</p><a class="download-btn" style="margin-top:8px;display:inline-flex" href="' +
               esc(latestUrl) +
-              '">Open latest release</a></p>'
+              '">Open GitHub Releases</a>'
           })
       })()
     </script>
