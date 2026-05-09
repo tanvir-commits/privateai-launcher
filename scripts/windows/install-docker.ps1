@@ -1,3 +1,7 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
@@ -5,7 +9,12 @@ try {
     # wsl --update) — those can take many minutes while the UI shows "Installing" even though Docker is fine.
     $dockerExeFast = Get-DockerExecutablePath
     if (-not [string]::IsNullOrWhiteSpace($dockerExeFast)) {
-        $verFast = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExeFast
+        $verFast = $null
+        for ($attempt = 0; $attempt -lt 8; $attempt++) {
+            $verFast = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExeFast
+            if (-not [string]::IsNullOrWhiteSpace($verFast)) { break }
+            Start-Sleep -Seconds 2
+        }
         if (-not [string]::IsNullOrWhiteSpace($verFast)) {
             $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is already installed and running.' -Details @{
                 dockerExe       = [string]$dockerExeFast
@@ -32,6 +41,8 @@ try {
         exit 1
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase preflight -Pct 12 -Detail 'ProgramData ACL OK'
+
     $winVirt = Enable-PrivateAIDockerWindowsOptionalFeatures
     if (-not $winVirt.ok) {
         $payload = New-ScriptResult -Ok $false -Status error -Message 'Could not enable Windows Subsystem for Linux and/or Virtual Machine Platform (DISM). See details; you may need an admin session or a supported Windows edition.' -Details @{
@@ -44,6 +55,9 @@ try {
         Write-Output (Write-ScriptJson $payload)
         exit 1
     }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase preflight -Pct 26 -Detail 'Hyper-V/WSL prerequisites ready'
+
     if ($winVirt.rebootNeeded) {
         $payload = New-ScriptResult -Ok $true -Status warning -Message 'WSL and Virtual Machine Platform are enabled. Restart the PC once, then click Run install flow again so Docker can finish installing and starting.' -Details @{
             prerequisiteLog = @($winVirt.logLines)
@@ -64,10 +78,17 @@ try {
         exit 1
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase wsl -Pct 38 -Detail 'WSL kernel updated'
+
     $dockerExe = Get-DockerExecutablePath
     if ($null -ne $dockerExe) {
         try {
-            $version = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExe
+            $version = $null
+            for ($attempt2 = 0; $attempt2 -lt 5; $attempt2++) {
+                $version = Get-PrivateAIDockerServerVersion -DockerExePath $dockerExe
+                if (-not [string]::IsNullOrWhiteSpace($version)) { break }
+                Start-Sleep -Seconds 2
+            }
             if (-not [string]::IsNullOrWhiteSpace($version)) {
                 $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is already installed and running.' -Details @{
                     dockerExe       = [string]$dockerExe
@@ -95,6 +116,8 @@ try {
         }
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase winget -Pct 44 -Detail 'Docker Desktop via winget (may take several minutes)'
+
     # --silent: suppress winget UI; Docker may still show WSL/backend prompts outside winget on first engine start.
     $out = & winget install -e --id Docker.DockerDesktop --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1
     $wingetExit = $LASTEXITCODE
@@ -107,8 +130,11 @@ try {
     }
     catch { }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct 52 -Detail 'Waiting for Docker Desktop files and PATH'
+
     # winget returns before the MSI/bootstrapper finishes; elevated PATH lags until registry refresh (Get-DockerExecutablePath).
     $deadline = (Get-Date).AddSeconds(420)
+    $heavyStart = Get-Date
     $dockerExe = $null
     $launchedDesktop = $false
     $wslPreheatBeforeDesktopPoll = $false
@@ -131,6 +157,14 @@ try {
             }
             catch { }
         }
+        try {
+            $el = ((Get-Date) - $heavyStart).TotalSeconds
+            $span = [double]420
+            $bridge = [int][Math]::Min(40, [Math]::Floor(($el / $span) * 40))
+            $pct = [int][Math]::Min(93, 52 + $bridge)
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct $pct -Detail 'Finishing install; follow any Docker Desktop prompts'
+        }
+        catch { }
         Start-Sleep -Seconds 3
     }
 
@@ -148,6 +182,8 @@ try {
                 }
             }
             catch { }
+
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct 96 -Detail 'Docker Desktop launching; wait for tray icon'
 
             $payload = New-ScriptResult -Ok $true -Status warning -Message 'Docker Desktop appears installed but docker.exe was not found yet (installer may still be finishing). Use Check Docker Desktop after Docker finishes first-time setup, or sign out and back in.' -Details @{
                 wingetExitCode    = $wingetExit
@@ -183,6 +219,8 @@ try {
         Write-Output (Write-ScriptJson $payload)
         exit 1
     }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct 100 -Detail 'docker.exe detected'
 
     $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker Desktop install completed.' -Details @{
         dockerExe        = [string]$dockerExe

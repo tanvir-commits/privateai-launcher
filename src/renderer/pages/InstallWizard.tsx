@@ -2,9 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import modelProfiles from '@config/model-profiles.json'
 import { ActionButton } from '../components/ActionButton'
 import { LogPanel } from '../components/LogPanel'
-import { StepCard, type StepState } from '../components/StepCard'
+import { StepCard, type StepScriptProgress, type StepState } from '../components/StepCard'
 import type { ScriptProgressEvent } from '@shared/scriptProgress'
+
+/** Same UI payload within this window skips a React update (fewer expensive re-renders during install). */
+function progressThrottleCoalesce(ev: ScriptProgressEvent): string {
+  return `${ev.phase}|${ev.percent ?? 'x'}|${ev.detail ?? ''}`
+}
+
+type ProgressThrottleGate = { at: number; sig: string }
 import type { ScriptResult } from '@shared/scriptContract'
+import {
+  emptyWizardInstallState,
+  persistedStepFromResult,
+  type CompletionChipKind,
+  type PersistableWizardOutcome,
+  type PersistedPortableComfy,
+  type WizardInstallPersisted
+} from '@shared/wizardInstallPersist'
 
 function comfyPortableProgressLine(ev: ScriptProgressEvent | null): {
   caption: string
@@ -33,6 +48,48 @@ function comfyPortableProgressLine(ev: ScriptProgressEvent | null): {
   }
   return {
     caption: 'Starting ComfyUI (first launch can take up to a few minutes)',
+    barPct: null,
+    indeterminate: true
+  }
+}
+
+function humanizeCorePhase(phase: string): string {
+  const map: Record<string, string> = {
+    download: 'Downloading',
+    extract: 'Unpacking',
+    starting: 'Starting',
+    install: 'Installing',
+    winget: 'Package manager',
+    preflight: 'Preparing system',
+    wsl: 'WSL setup',
+    checking: 'Checking',
+    check: 'Verifying',
+    configure: 'Configuring',
+    waiting: 'Waiting'
+  }
+  if (map[phase]) return map[phase]
+  return phase.length > 0 ? phase.charAt(0).toUpperCase() + phase.slice(1) : phase
+}
+
+/** Script progress shown inside the active step card (no duplicate title). */
+function wizardStepScriptProgress(ev: ScriptProgressEvent | null): StepScriptProgress {
+  const detail = ev?.detail?.trim() ? `: ${ev.detail}` : ''
+  if (ev && typeof ev.percent === 'number') {
+    return {
+      caption: `${humanizeCorePhase(ev.phase)}${detail} (${ev.percent}%)`,
+      barPct: ev.percent,
+      indeterminate: false
+    }
+  }
+  if (ev) {
+    return {
+      caption: `${humanizeCorePhase(ev.phase)}${detail}…`,
+      barPct: null,
+      indeterminate: true
+    }
+  }
+  return {
+    caption: 'Working…',
     barPct: null,
     indeterminate: true
   }
@@ -97,6 +154,9 @@ const OPTIONAL_COMFY_STEPS: WizardStep[] = [
   { id: 'cfg-comfy', title: 'Configure ComfyUI integration', script: 'configure-comfyui.ps1' }
 ]
 
+/** Probe-only installs: run fast checks instead of installers when dependency is ready. */
+const INSTALL_PREFLIGHT_IDS = ['ollama', 'docker-install', 'openwebui'] as const
+
 /** Status chip text while a step is running (installer UX). */
 const RUNNING_STATUS_LABEL: Partial<Record<string, string>> = {
   ollama: 'Installing',
@@ -138,6 +198,45 @@ function runningLine(step: WizardStep): string {
   return 'Running script…'
 }
 
+function stepStateToPersistedOutcome(state: StepState): PersistableWizardOutcome | null {
+  if (state === 'pending' || state === 'running') return null
+  return state
+}
+
+function hydrateCoreFromDisk(core: WizardInstallPersisted['core']): {
+  states: StepState[]
+  messages: string[]
+  subtitles: (string | null)[]
+  chips: (CompletionChipKind | null)[]
+} {
+  return {
+    states: CORE_STEPS.map((s) => {
+      const row = core[s.id]
+      return row ? row.state : 'pending'
+    }),
+    messages: CORE_STEPS.map((s) => core[s.id]?.message ?? 'Waiting'),
+    subtitles: CORE_STEPS.map((s) => core[s.id]?.version ?? null),
+    chips: CORE_STEPS.map((s) => core[s.id]?.completionChip ?? null)
+  }
+}
+
+function hydrateOptionalFromDisk(opt: WizardInstallPersisted['optional']): {
+  states: StepState[]
+  messages: string[]
+  subtitles: (string | null)[]
+  chips: (CompletionChipKind | null)[]
+} {
+  return {
+    states: OPTIONAL_COMFY_STEPS.map((s) => {
+      const row = opt[s.id]
+      return row ? row.state : 'pending'
+    }),
+    messages: OPTIONAL_COMFY_STEPS.map((s) => opt[s.id]?.message ?? 'Optional — not run yet.'),
+    subtitles: OPTIONAL_COMFY_STEPS.map((s) => opt[s.id]?.version ?? null),
+    chips: OPTIONAL_COMFY_STEPS.map((s) => opt[s.id]?.completionChip ?? null)
+  }
+}
+
 export default function InstallWizard() {
   const initialCore = useMemo(() => CORE_STEPS.map(() => 'pending' as StepState), [])
   const initialOpt = useMemo(() => OPTIONAL_COMFY_STEPS.map(() => 'pending' as StepState), [])
@@ -146,9 +245,24 @@ export default function InstallWizard() {
   const [coreMessages, setCoreMessages] = useState<string[]>(() =>
     CORE_STEPS.map(() => 'Waiting')
   )
+  const [coreVersionSubtitles, setCoreVersionSubtitles] = useState<(string | null)[]>(() =>
+    CORE_STEPS.map(() => null)
+  )
+  const [coreChipKinds, setCoreChipKinds] = useState<(CompletionChipKind | null)[]>(() =>
+    CORE_STEPS.map(() => null)
+  )
   const [optStates, setOptStates] = useState<StepState[]>(initialOpt)
   const [optMessages, setOptMessages] = useState<string[]>(() =>
     OPTIONAL_COMFY_STEPS.map(() => 'Optional — not run yet.')
+  )
+  const [optVersionSubtitles, setOptVersionSubtitles] = useState<(string | null)[]>(() =>
+    OPTIONAL_COMFY_STEPS.map(() => null)
+  )
+  const [optChipKinds, setOptChipKinds] = useState<(CompletionChipKind | null)[]>(() =>
+    OPTIONAL_COMFY_STEPS.map(() => null)
+  )
+  const [portableComfyPersist, setPortableComfyPersist] = useState<PersistedPortableComfy | null>(
+    null
   )
   const [portableInstalling, setPortableInstalling] = useState(false)
   const [comfyPortableVariant, setComfyPortableVariant] = useState<
@@ -157,19 +271,77 @@ export default function InstallWizard() {
   const [comfyPortableProgress, setComfyPortableProgress] = useState<ScriptProgressEvent | null>(
     null
   )
+  const [coreInstallProgress, setCoreInstallProgress] = useState<ScriptProgressEvent | null>(
+    null
+  )
+  const [optionalComfyInstallProgress, setOptionalComfyInstallProgress] =
+    useState<ScriptProgressEvent | null>(null)
 
   const [log, setLog] = useState<string>('')
 
   const comfyProgressListenTokenRef = useRef<string | null>(null)
+  const coreProgressListenTokenRef = useRef<string | null>(null)
+  const optionalComfyProgressListenTokenRef = useRef<string | null>(null)
 
+  const wizardPersistRef = useRef<WizardInstallPersisted>(emptyWizardInstallState())
   const runningScriptRef = useRef<{ script: string; since: number; elevated: boolean } | null>(
     null
   )
+  const coreProgressGateRef = useRef<ProgressThrottleGate>({ at: 0, sig: '' })
+  const comfyProgressGateRef = useRef<ProgressThrottleGate>({ at: 0, sig: '' })
+  const optionalProgressGateRef = useRef<ProgressThrottleGate>({ at: 0, sig: '' })
+  /** Forces the real installer scripts for ids in this set once (preflight skips disabled). */
+  const forceInstallerRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
+    let cancelled = false
+    void window.privateai.getWizardInstallState().then((p) => {
+      if (cancelled) return
+      wizardPersistRef.current = p
+      const hc = hydrateCoreFromDisk(p.core)
+      setCoreStates(hc.states)
+      setCoreMessages(hc.messages)
+      setCoreVersionSubtitles(hc.subtitles)
+      setCoreChipKinds(hc.chips)
+      const ho = hydrateOptionalFromDisk(p.optional)
+      setOptStates(ho.states)
+      setOptMessages(ho.messages)
+      setOptVersionSubtitles(ho.subtitles)
+      setOptChipKinds(ho.chips)
+      setPortableComfyPersist(p.portableComfy ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const writeWizardPersist = useCallback(async (next: WizardInstallPersisted) => {
+    const written = await window.privateai.setWizardInstallState(next)
+    wizardPersistRef.current = written
+    return written
+  }, [])
+
+  useEffect(() => {
+    const pass = (gateRef: typeof coreProgressGateRef, p: ScriptProgressEvent, setter: (v: ScriptProgressEvent) => void) => {
+      const sig = progressThrottleCoalesce(p)
+      const now = Date.now()
+      const g = gateRef.current
+      if (now - g.at < 420 && sig === g.sig) return
+      gateRef.current = { at: now, sig }
+      setter(p)
+    }
     return window.privateai.onScriptProgress((p) => {
-      if (p.token !== comfyProgressListenTokenRef.current) return
-      setComfyPortableProgress(p)
+      if (p.token === comfyProgressListenTokenRef.current) {
+        pass(comfyProgressGateRef, p, setComfyPortableProgress)
+        return
+      }
+      if (p.token === coreProgressListenTokenRef.current) {
+        pass(coreProgressGateRef, p, setCoreInstallProgress)
+        return
+      }
+      if (p.token === optionalComfyProgressListenTokenRef.current) {
+        pass(optionalProgressGateRef, p, setOptionalComfyInstallProgress)
+      }
     })
   }, [])
 
@@ -195,11 +367,21 @@ export default function InstallWizard() {
   const comfyOptRunning = useMemo(() => optStates.some((s) => s === 'running'), [optStates])
   const comfySectionBusy = comfyOptRunning || portableInstalling
 
+  const coreRunningIdx = coreStates.findIndex((s) => s === 'running')
+  const coreFlowBusy = useMemo(() => coreStates.some((s) => s === 'running'), [coreStates])
+  const optRunningIdx = optStates.findIndex((s) => s === 'running')
+
   const applyStepResult = useCallback(
-    (step: WizardStep, r: ScriptResult): { message: string; state: StepState } => {
-      appendLog(
-        `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
-      )
+    (
+      step: WizardStep,
+      r: ScriptResult,
+      opts?: { skipInstallerStdoutLog?: boolean }
+    ): { message: string; state: StepState; wizardOllamaMissingOnly: boolean } => {
+      if (!opts?.skipInstallerStdoutLog) {
+        appendLog(
+          `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
+        )
+      }
       if (r.details && Object.keys(r.details).length > 0) {
         if (
           !r.ok ||
@@ -225,63 +407,272 @@ export default function InstallWizard() {
         message =
           'Ollama is not installed yet (expected on a fresh machine). The next step installs it automatically.'
       }
-      return { message, state: nextState }
+      return { message, state: nextState, wizardOllamaMissingOnly }
     },
     [appendLog]
   )
+
+  const mergeDetails = (prev: ScriptResult['details']): Record<string, unknown> =>
+    typeof prev === 'object' && prev !== null ? { ...(prev as object) } : {}
+
+  const tryInstallPreflightProbe = async (
+    step: WizardStep,
+    progressToken: string
+  ): Promise<ScriptResult | null> => {
+    if (!(INSTALL_PREFLIGHT_IDS as readonly string[]).includes(step.id)) return null
+
+    const tokenOpts = {
+      elevated: false as boolean,
+      timeoutMs: step.id === 'docker-install' ? 90_000 : 140_000,
+      progressToken
+    }
+
+    if (step.id === 'ollama') {
+      appendLog(`--- preflight: check-ollama.ps1 (installer may be skipped when API is up)`)
+      const pr = await window.privateai.runScript('check-ollama.ps1', undefined, tokenOpts)
+      if (!pr.ok) return null
+      return {
+        ...pr,
+        message: `${pr.message} Install script skipped (probe).`,
+        details: { ...mergeDetails(pr.details), wizardProbeSkippedInstall: true },
+        warnings: [...pr.warnings]
+      }
+    }
+
+    if (step.id === 'docker-install') {
+      appendLog(`--- preflight: probe-docker-engine.ps1 (avoids elevated install-docker.ps1 when possible)`)
+      const pr = await window.privateai.runScript('probe-docker-engine.ps1', undefined, tokenOpts)
+      if (!pr.ok) return null
+      return {
+        ...pr,
+        details: mergeDetails(pr.details),
+        warnings: [...pr.warnings]
+      }
+    }
+
+    appendLog(`--- preflight: probe-openwebui.ps1 (skips installer when container already runs)`)
+    const pr = await window.privateai.runScript('probe-openwebui.ps1', undefined, tokenOpts)
+    if (!pr.ok) return null
+    return {
+      ...pr,
+      details: mergeDetails(pr.details),
+      warnings: [...pr.warnings]
+    }
+  }
+
+  const runCoreStepAt = async (i: number): Promise<boolean> => {
+    const step = CORE_STEPS[i]!
+    setCoreInstallProgress(null)
+    if (!coreProgressListenTokenRef.current) {
+      coreProgressListenTokenRef.current = globalThis.crypto.randomUUID()
+    }
+    setCoreStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
+    setCoreMessages((m) => m.map((v, idx) => (idx === i ? runningLine(step) : v)))
+
+    try {
+      if (!step.script) {
+        setCoreStates((s) => s.map((v, idx) => (idx === i ? 'success' : v)))
+        setCoreMessages((m) => m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v)))
+        const snapSelf = persistedStepFromResult({
+          stepId: step.id,
+          persistState: 'success',
+          message: 'No script for this step yet.',
+          result: {
+            ok: true,
+            status: 'success',
+            message: '-',
+            details: {},
+            warnings: [],
+            errors: []
+          }
+        })
+        const nextSnap: WizardInstallPersisted = {
+          ...wizardPersistRef.current,
+          core: { ...wizardPersistRef.current.core, [step.id]: snapSelf }
+        }
+        await writeWizardPersist(nextSnap)
+        setCoreVersionSubtitles((sub) =>
+          sub.map((v, j) => (j === i ? snapSelf.version ?? null : v))
+        )
+        setCoreChipKinds((c) => c.map((v, j) => (j === i ? snapSelf.completionChip ?? null : v)))
+        return true
+      }
+
+      runningScriptRef.current = {
+        script: step.script,
+        since: Date.now(),
+        elevated: step.elevated === true
+      }
+
+      let r: ScriptResult
+      let usedSkipInstallerLog = false
+
+      const progressTokenLocal = coreProgressListenTokenRef.current!
+
+      const mustRunInstaller = forceInstallerRef.current.has(step.id)
+      if (mustRunInstaller) {
+        forceInstallerRef.current.delete(step.id)
+      }
+
+      const allowPreflightProbe =
+        !mustRunInstaller && (INSTALL_PREFLIGHT_IDS as readonly string[]).includes(step.id)
+      if (allowPreflightProbe) {
+        const pref = await tryInstallPreflightProbe(step, progressTokenLocal)
+        if (pref != null && pref.ok) {
+          appendLog(`--- ${step.script} bypassed (${step.id}); dependency already satisfies this step`)
+          r = pref
+          usedSkipInstallerLog = true
+        } else {
+          appendLog(`--- ${step.script} started${step.elevated ? ' [elevated - approve UAC if Windows shows it]' : ''} ---`)
+          const scriptArgs =
+            step.id === 'models' ? { Model: WIZARD_STARTER_OLLAMA_MODEL } : undefined
+          r = await window.privateai.runScript(step.script, scriptArgs, {
+            elevated: step.elevated,
+            timeoutMs: step.timeoutMs,
+            progressToken: progressTokenLocal
+          })
+          usedSkipInstallerLog = false
+        }
+      } else {
+        if (mustRunInstaller && (INSTALL_PREFLIGHT_IDS as readonly string[]).includes(step.id)) {
+          appendLog(`--- ${step.script} full run (${step.id} — preflight skipped) ---`)
+        } else {
+          appendLog(`--- ${step.script} started${step.elevated ? ' [elevated - approve UAC if Windows shows it]' : ''} ---`)
+        }
+        const scriptArgs = step.id === 'models' ? { Model: WIZARD_STARTER_OLLAMA_MODEL } : undefined
+        r = await window.privateai.runScript(step.script, scriptArgs, {
+          elevated: step.elevated,
+          timeoutMs: step.timeoutMs,
+          progressToken: progressTokenLocal
+        })
+      }
+
+      runningScriptRef.current = null
+      const { message, state, wizardOllamaMissingOnly } = applyStepResult(step, r, {
+        skipInstallerStdoutLog: usedSkipInstallerLog
+      })
+      setCoreMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
+      setCoreStates((s) => s.map((v, idx) => (idx === i ? state : v)))
+      const persistOutcome = stepStateToPersistedOutcome(state)
+      if (persistOutcome !== null) {
+        const snap = persistedStepFromResult({
+          stepId: step.id,
+          persistState: persistOutcome,
+          message,
+          result: r,
+          wizardOllamaMissingOnly
+        })
+        const nextPersist: WizardInstallPersisted = {
+          ...wizardPersistRef.current,
+          core: { ...wizardPersistRef.current.core, [step.id]: snap }
+        }
+        await writeWizardPersist(nextPersist)
+        setCoreVersionSubtitles((sub) =>
+          sub.map((v, j) => (j === i ? snap.version ?? null : v))
+        )
+        setCoreChipKinds((c) => c.map((v, j) => (j === i ? snap.completionChip ?? null : v)))
+      }
+      const rebootPause =
+        step.id === 'docker-install' &&
+        r.ok &&
+        typeof r.details === 'object' &&
+        r.details !== null &&
+        (r.details as Record<string, unknown>).rebootRequired === true
+      const precheckAllowsNextInstaller =
+        !r.ok &&
+        step.id === 'ollama-check' &&
+        r.errors.some((err) => err.code === 'OLLAMA_NOT_FOUND')
+      if ((!r.ok && !precheckAllowsNextInstaller) || rebootPause) return false
+      return true
+    } catch (e) {
+      runningScriptRef.current = null
+      appendLog(`${step.script ?? 'step'} threw: ${String(e)}`)
+      setCoreStates((s) => s.map((v, idx) => (idx === i ? 'error' : v)))
+      setCoreMessages((m) => m.map((v, idx) => (idx === i ? String(e) : v)))
+      const errSnap = {
+        state: 'error' as const,
+        message: String(e),
+        version: null as string | null,
+        completionChip: null as CompletionChipKind | null,
+        recordedAt: new Date().toISOString()
+      }
+      const next: WizardInstallPersisted = {
+        ...wizardPersistRef.current,
+        core: { ...wizardPersistRef.current.core, [step.id]: errSnap }
+      }
+      await writeWizardPersist(next)
+      setCoreVersionSubtitles((sub) => sub.map((v, j) => (j === i ? null : v)))
+      setCoreChipKinds((c) => c.map((v, j) => (j === i ? null : v)))
+      return false
+    }
+  }
+
+  /** Runs step `startIdx` and every step after it. Resets persisted state only for those rows. */
+  const runCoreFromStepDownward = async (startIdx: number) => {
+    if (startIdx < 0 || startIdx >= CORE_STEPS.length) return
+    const firstId = CORE_STEPS[startIdx]!.id
+    forceInstallerRef.current.add(firstId)
+
+    appendLog('')
+    appendLog(
+      `--- Continue core from step ${startIdx + 1} (“${CORE_STEPS[startIdx]!.title}”) through the last step ---`
+    )
+    runningScriptRef.current = null
+
+    const prunedCore: WizardInstallPersisted['core'] = { ...wizardPersistRef.current.core }
+    for (let j = startIdx; j < CORE_STEPS.length; j++) {
+      delete prunedCore[CORE_STEPS[j]!.id]
+    }
+    await writeWizardPersist({ ...wizardPersistRef.current, core: prunedCore })
+
+    setCoreStates((states) =>
+      states.map((s, idx) => (idx < startIdx ? s : 'pending'))
+    )
+    setCoreMessages((m) =>
+      m.map((v, idx) => (idx < startIdx ? v : 'Waiting'))
+    )
+    setCoreVersionSubtitles((sub) => sub.map((v, idx) => (idx < startIdx ? v : null)))
+    setCoreChipKinds((cks) => cks.map((v, idx) => (idx < startIdx ? v : null)))
+
+    coreProgressGateRef.current = { at: 0, sig: '' }
+    const progressToken = globalThis.crypto.randomUUID()
+    coreProgressListenTokenRef.current = progressToken
+    setCoreInstallProgress(null)
+
+    try {
+      for (let i = startIdx; i < CORE_STEPS.length; i++) {
+        const advance = await runCoreStepAt(i)
+        if (!advance) break
+      }
+    } finally {
+      coreProgressListenTokenRef.current = null
+      setCoreInstallProgress(null)
+    }
+  }
 
   const runCore = async () => {
     setLog('')
     runningScriptRef.current = null
     setCoreStates(CORE_STEPS.map(() => 'pending'))
     setCoreMessages(CORE_STEPS.map(() => 'Waiting'))
+    setCoreVersionSubtitles(CORE_STEPS.map(() => null))
+    setCoreChipKinds(CORE_STEPS.map(() => null))
+    const cleared: WizardInstallPersisted = { ...wizardPersistRef.current, core: {} }
+    await writeWizardPersist(cleared)
 
-    for (let i = 0; i < CORE_STEPS.length; i++) {
-      const step = CORE_STEPS[i]!
-      setCoreStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
-      setCoreMessages((m) => m.map((v, idx) => (idx === i ? runningLine(step) : v)))
-      try {
-        if (!step.script) {
-          setCoreStates((s) => s.map((v, idx) => (idx === i ? 'success' : v)))
-          setCoreMessages((m) => m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v)))
-          continue
-        }
-        runningScriptRef.current = {
-          script: step.script,
-          since: Date.now(),
-          elevated: step.elevated === true
-        }
-        appendLog(
-          `--- ${step.script} started${step.elevated ? ' [elevated - approve UAC if Windows shows it]' : ''} ---`
-        )
-        const scriptArgs =
-          step.id === 'models' ? { Model: WIZARD_STARTER_OLLAMA_MODEL } : undefined
-        const r: ScriptResult = await window.privateai.runScript(step.script, scriptArgs, {
-          elevated: step.elevated,
-          timeoutMs: step.timeoutMs
-        })
-        runningScriptRef.current = null
-        const { message, state } = applyStepResult(step, r)
-        setCoreMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
-        setCoreStates((s) => s.map((v, idx) => (idx === i ? state : v)))
-        const rebootPause =
-          step.id === 'docker-install' &&
-          r.ok &&
-          typeof r.details === 'object' &&
-          r.details !== null &&
-          (r.details as Record<string, unknown>).rebootRequired === true
-        const precheckAllowsNextInstaller =
-          !r.ok &&
-          step.id === 'ollama-check' &&
-          r.errors.some((err) => err.code === 'OLLAMA_NOT_FOUND')
-        if ((!r.ok && !precheckAllowsNextInstaller) || rebootPause) break
-      } catch (e) {
-        runningScriptRef.current = null
-        appendLog(`${step.script} threw: ${String(e)}`)
-        setCoreStates((s) => s.map((v, idx) => (idx === i ? 'error' : v)))
-        setCoreMessages((m) => m.map((v, idx) => (idx === i ? String(e) : v)))
-        break
+    const progressToken = globalThis.crypto.randomUUID()
+    coreProgressListenTokenRef.current = progressToken
+    coreProgressGateRef.current = { at: 0, sig: '' }
+    setCoreInstallProgress(null)
+
+    try {
+      for (let i = 0; i < CORE_STEPS.length; i++) {
+        const advance = await runCoreStepAt(i)
+        if (!advance) break
       }
+    } finally {
+      coreProgressListenTokenRef.current = null
+      setCoreInstallProgress(null)
     }
   }
 
@@ -295,41 +686,93 @@ export default function InstallWizard() {
     runningScriptRef.current = null
     setOptStates(OPTIONAL_COMFY_STEPS.map(() => 'pending'))
     setOptMessages(OPTIONAL_COMFY_STEPS.map(() => 'Waiting'))
+    setOptVersionSubtitles(OPTIONAL_COMFY_STEPS.map(() => null))
+    setOptChipKinds(OPTIONAL_COMFY_STEPS.map(() => null))
+    const clearedOpt: WizardInstallPersisted = { ...wizardPersistRef.current, optional: {} }
+    await writeWizardPersist(clearedOpt)
 
-    for (let i = 0; i < OPTIONAL_COMFY_STEPS.length; i++) {
-      const step = OPTIONAL_COMFY_STEPS[i]!
-      setOptStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
-      setOptMessages((m) => m.map((v, idx) => (idx === i ? runningLine(step) : v)))
-      try {
-        if (!step.script) {
-          setOptStates((s) => s.map((v, idx) => (idx === i ? 'success' : v)))
-          setOptMessages((m) =>
-            m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v))
-          )
-          continue
+    const progressToken = globalThis.crypto.randomUUID()
+    optionalComfyProgressListenTokenRef.current = progressToken
+    optionalProgressGateRef.current = { at: 0, sig: '' }
+    setOptionalComfyInstallProgress(null)
+
+    try {
+      for (let i = 0; i < OPTIONAL_COMFY_STEPS.length; i++) {
+        const step = OPTIONAL_COMFY_STEPS[i]!
+        setOptionalComfyInstallProgress(null)
+        setOptStates((s) => s.map((v, idx) => (idx === i ? 'running' : v)))
+        setOptMessages((m) => m.map((v, idx) => (idx === i ? runningLine(step) : v)))
+        try {
+          if (!step.script) {
+            setOptStates((s) => s.map((v, idx) => (idx === i ? 'success' : v)))
+            setOptMessages((m) =>
+              m.map((v, idx) => (idx === i ? 'No script for this step yet.' : v))
+            )
+            continue
+          }
+          runningScriptRef.current = {
+            script: step.script,
+            since: Date.now(),
+            elevated: step.elevated === true
+          }
+          appendLog(`--- ${step.script} started (ComfyUI extras) ---`)
+          const r: ScriptResult = await window.privateai.runScript(step.script, undefined, {
+            elevated: step.elevated,
+            timeoutMs: step.timeoutMs,
+            progressToken
+          })
+          runningScriptRef.current = null
+          const { message, state, wizardOllamaMissingOnly } = applyStepResult(step, r)
+          setOptMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
+          setOptStates((s) => s.map((v, idx) => (idx === i ? state : v)))
+          const persistOutcome = stepStateToPersistedOutcome(state)
+          if (persistOutcome !== null) {
+            const snap = persistedStepFromResult({
+              stepId: step.id,
+              persistState: persistOutcome,
+              message,
+              result: r,
+              wizardOllamaMissingOnly
+            })
+            const next: WizardInstallPersisted = {
+              ...wizardPersistRef.current,
+              optional: { ...wizardPersistRef.current.optional, [step.id]: snap }
+            }
+            await writeWizardPersist(next)
+            setOptVersionSubtitles((sub) =>
+              sub.map((v, j) => (j === i ? snap.version ?? null : v))
+            )
+            setOptChipKinds((cks) =>
+              cks.map((v, j) => (j === i ? snap.completionChip ?? null : v))
+            )
+          }
+          if (!r.ok) break
+        } catch (e) {
+          const optStep = OPTIONAL_COMFY_STEPS[i]!
+          runningScriptRef.current = null
+          appendLog(`${optStep.script} threw: ${String(e)}`)
+          setOptStates((s) => s.map((v, idx) => (idx === i ? 'error' : v)))
+          setOptMessages((m) => m.map((v, idx) => (idx === i ? String(e) : v)))
+          const errSnap = {
+            state: 'error' as const,
+            message: String(e),
+            version: null as string | null,
+            completionChip: null as CompletionChipKind | null,
+            recordedAt: new Date().toISOString()
+          }
+          const next: WizardInstallPersisted = {
+            ...wizardPersistRef.current,
+            optional: { ...wizardPersistRef.current.optional, [optStep.id]: errSnap }
+          }
+          await writeWizardPersist(next)
+          setOptVersionSubtitles((sub) => sub.map((v, j) => (j === i ? null : v)))
+          setOptChipKinds((cks) => cks.map((v, j) => (j === i ? null : v)))
+          break
         }
-        runningScriptRef.current = {
-          script: step.script,
-          since: Date.now(),
-          elevated: step.elevated === true
-        }
-        appendLog(`--- ${step.script} started (ComfyUI extras) ---`)
-        const r: ScriptResult = await window.privateai.runScript(step.script, undefined, {
-          elevated: step.elevated,
-          timeoutMs: step.timeoutMs
-        })
-        runningScriptRef.current = null
-        const { message, state } = applyStepResult(step, r)
-        setOptMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
-        setOptStates((s) => s.map((v, idx) => (idx === i ? state : v)))
-        if (!r.ok) break
-      } catch (e) {
-        runningScriptRef.current = null
-        appendLog(`${step.script} threw: ${String(e)}`)
-        setOptStates((s) => s.map((v, idx) => (idx === i ? 'error' : v)))
-        setOptMessages((m) => m.map((v, idx) => (idx === i ? String(e) : v)))
-        break
       }
+    } finally {
+      optionalComfyProgressListenTokenRef.current = null
+      setOptionalComfyInstallProgress(null)
     }
   }
 
@@ -341,6 +784,7 @@ export default function InstallWizard() {
     if (portableInstalling) return
     const progressToken = globalThis.crypto.randomUUID()
     comfyProgressListenTokenRef.current = progressToken
+    comfyProgressGateRef.current = { at: 0, sig: '' }
     setComfyPortableProgress(null)
     setPortableInstalling(true)
     runningScriptRef.current = {
@@ -365,8 +809,38 @@ export default function InstallWizard() {
         appendLog(`errors: ${JSON.stringify(r.errors).slice(0, 4000)}`)
       }
       appendLog(r.message)
+      const outcome: PersistableWizardOutcome =
+        r.status === 'warning' ? 'warning' : r.status === 'error' || !r.ok ? 'error' : 'success'
+      const d =
+        r.details && typeof r.details === 'object'
+          ? (r.details as Record<string, unknown>)
+          : undefined
+      const urlHint =
+        d && typeof d.comfyUrl === 'string' && d.comfyUrl.trim().length > 0
+          ? d.comfyUrl.trim()
+          : null
+      const pu: PersistedPortableComfy = {
+        state: outcome,
+        message: r.message,
+        version: urlHint,
+        variant: comfyPortableVariant,
+        recordedAt: new Date().toISOString()
+      }
+      const next: WizardInstallPersisted = { ...wizardPersistRef.current, portableComfy: pu }
+      await writeWizardPersist(next)
+      setPortableComfyPersist(pu)
     } catch (e) {
       appendLog(`install-comfyui-portable.ps1 threw: ${String(e)}`)
+      const pu: PersistedPortableComfy = {
+        state: 'error',
+        message: String(e),
+        version: null,
+        variant: comfyPortableVariant,
+        recordedAt: new Date().toISOString()
+      }
+      const next: WizardInstallPersisted = { ...wizardPersistRef.current, portableComfy: pu }
+      await writeWizardPersist(next)
+      setPortableComfyPersist(pu)
     } finally {
       comfyProgressListenTokenRef.current = null
       setComfyPortableProgress(null)
@@ -385,11 +859,14 @@ export default function InstallWizard() {
 
   return (
     <div>
-      <h1 className="page-title">Install Wizard</h1>
+      <h1 className="page-title">Install</h1>
       <p className="page-sub">
-        Start with core setup for local chat (<strong>Ollama</strong> + <strong>Open WebUI</strong>).
-        ComfyUI sits at the bottom: use the portable downloader if you want it, then the launcher verifies
-        the port and records bundled workflow templates.
+        Core setup probes what is already installed (Ollama, Docker engine, Open WebUI) so installers and
+        UAC run only when needed. Chips show <strong>Installed</strong> vs <strong>Verified</strong> for clarity.
+        <strong>Run from here</strong> continues from that row through the rest of core setup (installer for
+        that row forces once; probes still apply afterward). Installer scripts can spike CPU/Disk—that is
+        expected; progress updates are intentionally throttled to keep the launcher light. Finished steps are
+        saved on this machine.
       </p>
 
       <div className="row-actions" style={{ marginBottom: 16 }}>
@@ -399,17 +876,43 @@ export default function InstallWizard() {
       </div>
 
       <div className="stack">
-        {CORE_STEPS.map((s, idx) => (
-          <StepCard
-            key={s.id}
-            index={idx + 1}
-            title={s.title}
-            message={coreMessages[idx] ?? ''}
-            state={coreStates[idx] ?? 'pending'}
-            runningStatusLabel={RUNNING_STATUS_LABEL[s.id]}
-            showIndeterminateProgress
-          />
-        ))}
+        {CORE_STEPS.map((s, idx) => {
+          const coreProg =
+            idx === coreRunningIdx && (coreStates[idx] ?? 'pending') === 'running'
+              ? wizardStepScriptProgress(coreInstallProgress)
+              : null
+          return (
+            <StepCard
+              key={s.id}
+              index={idx + 1}
+              title={s.title}
+              completionChip={coreChipKinds[idx] ?? undefined}
+              versionSubtitle={coreVersionSubtitles[idx]}
+              message={coreMessages[idx] ?? ''}
+              state={coreStates[idx] ?? 'pending'}
+              runningStatusLabel={RUNNING_STATUS_LABEL[s.id]}
+              showIndeterminateProgress={coreProg === null}
+              scriptProgress={coreProg}
+            >
+              {coreFlowBusy ? null : (
+                <div style={{ marginTop: 10 }}>
+                  <div className="row-actions">
+                    <ActionButton
+                      variant="ghost"
+                      onClick={() => void runCoreFromStepDownward(idx)}
+                      style={{ fontSize: 12 }}
+                    >
+                      Run from here
+                    </ActionButton>
+                  </div>
+                  <span className="muted" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
+                    Runs this row and every step below (earlier rows stay as they are).
+                  </span>
+                </div>
+              )}
+            </StepCard>
+          )
+        })}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -427,6 +930,17 @@ export default function InstallWizard() {
           <code>workflows/comfyui</code>. Default URL is port <code>8188</code> unless{' '}
           <code>config/ports.json</code> says otherwise.
         </p>
+        {portableComfyPersist && !portableInstalling ? (
+          <p className="muted" style={{ fontSize: 12, marginBottom: 12 }} title={portableComfyPersist.message}>
+            <strong>Portable Comfy</strong>
+            {portableComfyPersist.variant ? ` (${portableComfyPersist.variant})` : ''}
+            {portableComfyPersist.version ? ` — ${portableComfyPersist.version}` : ''}
+            {' — '}
+            {portableComfyPersist.message.length > 140
+              ? `${portableComfyPersist.message.slice(0, 139)}…`
+              : portableComfyPersist.message}
+          </p>
+        ) : null}
         {comfyPortableProg ? (
           <div style={{ marginBottom: 14 }} role="status" aria-live="polite">
             <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--muted)' }}>
@@ -482,17 +996,28 @@ export default function InstallWizard() {
           Optional steps (only run when you tap the button above)
         </p>
         <div className="stack">
-          {OPTIONAL_COMFY_STEPS.map((s, idx) => (
-            <StepCard
-              key={s.id}
-              index={idx + 1}
-              title={s.title}
-              message={optMessages[idx] ?? ''}
-              state={optStates[idx] ?? 'pending'}
-              runningStatusLabel={RUNNING_STATUS_LABEL[s.id]}
-              showIndeterminateProgress
-            />
-          ))}
+          {OPTIONAL_COMFY_STEPS.map((s, idx) => {
+            const optProg =
+              !portableInstalling &&
+              idx === optRunningIdx &&
+              (optStates[idx] ?? 'pending') === 'running'
+                ? wizardStepScriptProgress(optionalComfyInstallProgress)
+                : null
+            return (
+              <StepCard
+                key={s.id}
+                index={idx + 1}
+                title={s.title}
+                completionChip={optChipKinds[idx] ?? undefined}
+                versionSubtitle={optVersionSubtitles[idx]}
+                message={optMessages[idx] ?? ''}
+                state={optStates[idx] ?? 'pending'}
+                runningStatusLabel={RUNNING_STATUS_LABEL[s.id]}
+                showIndeterminateProgress={optProg === null}
+                scriptProgress={optProg}
+              />
+            )
+          })}
         </div>
       </div>
     </div>

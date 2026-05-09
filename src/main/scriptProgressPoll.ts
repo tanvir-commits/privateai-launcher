@@ -7,6 +7,8 @@ import type { ScriptProgressEvent } from '@shared/scriptProgress'
 const PROGRESS_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const PHASE_RE = /^[a-z][a-z0-9_-]{0,63}$/
+
 /** Accepts UUID v1-v5-shaped tokens only; rejects path injection attempts. */
 export function sanitizeProgressToken(t: unknown): string | null {
   if (typeof t !== 'string') return null
@@ -38,10 +40,15 @@ export function subscribeScriptProgressFromFile(
       if (trimmed.length === 0 || trimmed === lastRawTrimmed) return
       lastRawTrimmed = trimmed
 
-      const parsed = JSON.parse(trimmed) as { phase?: unknown; pct?: unknown }
+      const parsed = JSON.parse(trimmed) as {
+        phase?: unknown
+        pct?: unknown
+        detail?: unknown
+      }
       if (typeof parsed.phase !== 'string') return
-      const ph = parsed.phase
-      if (ph !== 'download' && ph !== 'extract' && ph !== 'starting') return
+
+      const ph = parsed.phase.trim().toLowerCase()
+      if (ph.length < 1 || ph.length > 64 || !PHASE_RE.test(ph)) return
 
       let percent: number | null = null
       if ('pct' in parsed && parsed.pct !== null && parsed.pct !== undefined && parsed.pct !== '') {
@@ -49,16 +56,22 @@ export function subscribeScriptProgressFromFile(
         if (!Number.isNaN(n)) percent = Math.max(0, Math.min(100, Math.round(n)))
       }
 
-      const payload: ScriptProgressEvent = { token, phase: ph, percent }
+      let detail: string | undefined
+      if (typeof parsed.detail === 'string' && parsed.detail.trim().length > 0) {
+        detail = parsed.detail.trim().slice(0, 300)
+      }
+
+      const payload: ScriptProgressEvent = { token, phase: ph, percent, detail }
       sender.send('script:progress', payload)
     } catch {
       /* missing or truncated file */
     }
   }
 
+  /** Slower polling reduces disk churn and IPC during long installer scripts (less UI/main-thread pressure). */
   const id = setInterval(() => {
     void tick()
-  }, 280)
+  }, 650)
   void tick()
 
   return () => {

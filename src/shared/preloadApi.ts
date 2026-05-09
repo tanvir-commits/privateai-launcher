@@ -1,6 +1,7 @@
 import type { DashboardStatus } from './dashboardTypes'
 import type { ScriptProgressEvent } from './scriptProgress'
 import type { ScriptResult } from './scriptContract'
+import type { WizardInstallPersisted } from './wizardInstallPersist'
 
 export interface HardwareScanPayload {
   system: ScriptResult | null
@@ -9,7 +10,11 @@ export interface HardwareScanPayload {
 }
 
 export interface PrivateaiApi {
+  getWizardInstallState: () => Promise<WizardInstallPersisted>
+  setWizardInstallState: (payload: WizardInstallPersisted) => Promise<WizardInstallPersisted>
   getStatus: () => Promise<DashboardStatus>
+  /** Runs health check and returns updated dashboard (refreshes service dots). */
+  refreshStatus: () => Promise<DashboardStatus>
   scanHardware: () => Promise<HardwareScanPayload>
   runHealth: () => Promise<ScriptResult>
   runScript: (

@@ -38,6 +38,59 @@ function Write-ScriptJson {
     ($Payload | ConvertTo-Json -Compress -Depth 25)
 }
 
+$script:PrivateAIProgressLastUtc = [datetime]::MinValue
+
+<#
+    Coarse snapshot for Electron main to poll into the Install Wizard (same JSON shape as comfy portable).
+
+    Scripts pass -ProgressFile from the launcher; throttle updates to avoid churn.
+#>
+function Write-PrivateAIProgressFile {
+    param(
+        [string]$ProgressFile,
+        [Parameter(Mandatory)][string]$Phase,
+        [object]$Pct,
+        [string]$Detail = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ProgressFile)) { return }
+
+    $ph = ([string]$Phase).Trim().ToLowerInvariant()
+    if ($ph.Length -gt 64) { $ph = $ph.Substring(0, 64) }
+    if ($ph.Length -lt 1) { $ph = 'working' }
+
+    $nowUtc = [datetime]::UtcNow
+    # Throttle aggressively: Docker/winget/DISM steps can hammer this and drive disk + Electron polling cost.
+    if (($nowUtc - $script:PrivateAIProgressLastUtc).TotalMilliseconds -lt 520) { return }
+    $script:PrivateAIProgressLastUtc = $nowUtc
+
+    $pctOut = $null
+    if ($null -ne $Pct) {
+        try {
+            $n = [int]$Pct
+            if (($n -ge 0) -and ($n -le 100)) { $pctOut = $n }
+        }
+        catch { }
+    }
+
+    $detailStr = ''
+    if (-not [string]::IsNullOrWhiteSpace($Detail)) {
+        $detailStr = [string]$Detail
+        if ($detailStr.Length -gt 200) { $detailStr = $detailStr.Substring(0, 200) }
+    }
+
+    $obj = [ordered]@{ phase = $ph; pct = $pctOut }
+    if (-not [string]::IsNullOrWhiteSpace($detailStr)) {
+        $obj.detail = $detailStr
+    }
+
+    $json = ($obj | ConvertTo-Json -Compress)
+    try {
+        Set-Content -LiteralPath $ProgressFile -Value $json -Encoding utf8 -Force
+    }
+    catch { }
+}
+
 function Test-TcpPortFree {
     param([int]$Port)
     try {
@@ -54,7 +107,9 @@ function Test-TcpPortFree {
     which Electron-spawned PowerShell may not have on PATH — always probe known paths.
 #>
 function Get-OllamaExecutablePath {
-    $fromPath = Get-Command ollama -ErrorAction SilentlyContinue
+    Update-PrivateAIPathFromRegistry
+
+    $fromPath = Get-Command ollama.exe -ErrorAction SilentlyContinue
     if ($null -ne $fromPath) { return [string]$fromPath.Source }
 
     $candidates = @(
@@ -72,6 +127,21 @@ function Get-OllamaExecutablePath {
         }
     }
     return $null
+}
+
+function Get-PrivateAIOllamaVersionLine {
+    param([string]$OllamaExePath)
+    if ([string]::IsNullOrWhiteSpace($OllamaExePath)) { return $null }
+    try {
+        $raw = (& $OllamaExePath version *>&1 | Out-String).Trim()
+        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+        $line = ($raw -split '\r?\n' | Where-Object { $_.Trim().Length -gt 0 } | Select-Object -First 1)
+        if ([string]::IsNullOrWhiteSpace($line)) { return $null }
+        return [string]$line.Trim()
+    }
+    catch {
+        return $null
+    }
 }
 
 function Start-PrivateAIOllamaIfInstalled {
@@ -130,9 +200,8 @@ function Get-DockerDesktopExePath {
 function Get-DockerExecutablePath {
     Update-PrivateAIPathFromRegistry
 
-    $fromPath = Get-Command docker.exe -ErrorAction SilentlyContinue
-    if ($null -ne $fromPath) { return [string]$fromPath.Source }
-
+    # Prefer Docker Desktop's bundled CLI. `Get-Command docker.exe` can resolve a stub, another
+    # distro's binary, or a broken PATH entry first — then `docker version` never talks to Desktop.
     $candidates = @(
         (Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'),
         (Join-Path $env:ProgramFiles 'Docker\Docker\resources\docker.exe'),
@@ -149,6 +218,9 @@ function Get-DockerExecutablePath {
             return [string]$p
         }
     }
+
+    $fromPath = Get-Command docker.exe -ErrorAction SilentlyContinue
+    if ($null -ne $fromPath) { return [string]$fromPath.Source }
 
     # Layout changes / per-user winget — shallow search under Docker roots
     foreach ($root in @(
@@ -209,6 +281,387 @@ function Invoke-PrivateAIDocker {
 }
 
 <#
+    If the canonical container name is missing, find a container publishing $HostPort that looks like Open WebUI
+    (image contains open-webui, or name matches privateai-open-webui).
+#>
+function Resolve-PrivateAIOpenWebUiContainerName {
+    param(
+        [Parameter(Mandatory)][int]$HostPort,
+        [string]$DockerExePath = ''
+    )
+    try {
+        if ([string]::IsNullOrWhiteSpace($DockerExePath)) {
+            $DockerExePath = Get-DockerExecutablePath
+        }
+        if ([string]::IsNullOrWhiteSpace($DockerExePath)) {
+            return $null
+        }
+        $r = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
+            -ArgList @('ps', '-a', '--filter', "publish=$HostPort", '--format', '{{.Names}}\t{{.Image}}') `
+            -OutputCharLimit 8000
+        if ($r.ExitCode -ne 0) {
+            return $null
+        }
+        $rows = @(
+            ($r.Output -split "(`r`n|`n|`r)") |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $_ -ne '' }
+        )
+        if ($rows.Count -eq 0) {
+            return $null
+        }
+        $parsed = foreach ($row in $rows) {
+            $parts = $row -split "`t", 2
+            $nm = $parts[0].Trim()
+            $img = if ($parts.Count -gt 1) { $parts[1].Trim() } else { '' }
+            [pscustomobject]@{ Name = $nm; Image = $img }
+        }
+        $exact = $parsed | Where-Object { $_.Name -eq 'privateai-open-webui' } | Select-Object -First 1
+        if ($null -ne $exact) {
+            return [string]$exact.Name
+        }
+        $byImg = $parsed | Where-Object { $_.Image -match 'open-webui' } | Select-Object -First 1
+        if ($null -ne $byImg) {
+            return [string]$byImg.Name
+        }
+        return [string]$parsed[0].Name
+    }
+    catch {
+        return $null
+    }
+}
+
+<#
+    After the Docker engine is up: if privateai-open-webui exists but is stopped, run docker start.
+    Does not throw; returns a small status object for repair / manage-app messaging.
+#>
+function Start-PrivateAIOpenWebUiContainerIfStopped {
+    try {
+        $dockerExe = Get-DockerExecutablePath
+        if ([string]::IsNullOrWhiteSpace($dockerExe)) {
+            return [pscustomobject]@{ ok = $true; action = 'skipped'; reason = 'docker_exe_missing' }
+        }
+        $ports = Get-PortsConfig
+        $hostPort = [int]$ports.openWebui
+        $preferred = 'privateai-open-webui'
+        $name = $preferred
+
+        $insp = Invoke-PrivateAIDocker -DockerExePath $dockerExe -ArgList @('inspect', '-f', '{{.State.Running}}', $name) -OutputCharLimit 800
+        if ($insp.ExitCode -ne 0) {
+            $alt = Resolve-PrivateAIOpenWebUiContainerName -DockerExePath $dockerExe -HostPort $hostPort
+            if ([string]::IsNullOrWhiteSpace($alt)) {
+                return [pscustomobject]@{ ok = $true; action = 'skipped'; reason = 'container_absent' }
+            }
+            $name = $alt
+            $insp = Invoke-PrivateAIDocker -DockerExePath $dockerExe -ArgList @('inspect', '-f', '{{.State.Running}}', $name) -OutputCharLimit 800
+            if ($insp.ExitCode -ne 0) {
+                return [pscustomobject]@{ ok = $true; action = 'skipped'; reason = 'container_absent' }
+            }
+        }
+        $txt = (Get-PrivateAINormalizedConsoleText $insp.Output).Trim()
+        if ($txt -match '^\s*true\s*$') {
+            return [pscustomobject]@{ ok = $true; action = 'skipped'; reason = 'already_running'; container = $name }
+        }
+        $st = Invoke-PrivateAIDocker -DockerExePath $dockerExe -ArgList @('start', $name) -OutputCharLimit 2000
+        if ($st.ExitCode -eq 0) {
+            return [pscustomobject]@{
+                ok         = $true
+                action     = 'started'
+                reason     = $null
+                container  = $name
+                outputTail = (Get-PrivateAITailText $st.Output 400)
+            }
+        }
+        return [pscustomobject]@{
+            ok         = $false
+            action     = 'start_failed'
+            reason     = 'docker_start_nonzero'
+            container  = $name
+            outputTail = (Get-PrivateAITailText $st.Output 800)
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            ok     = $false
+            action = 'error'
+            reason = (Get-PrivateAITailText $_.Exception.Message 500)
+        }
+    }
+}
+
+<#
+    Streams `docker pull` output into temp tails and emits Write-PrivateAIProgressFile snapshots.
+    Mirrors Start-Process usage in Invoke-PrivateAIDocker under $ErrorActionPreference Stop.
+#>
+function Invoke-PrivateAIDockerPullWithProgress {
+    param(
+        [Parameter(Mandatory)][string]$DockerExePath,
+        [Parameter(Mandatory)][string]$Image,
+        [string]$ProgressFile = '',
+        [int]$OutputCharLimit = 12000
+    )
+
+    function Read-Tails {
+        param([string]$Path)
+        if (-not (Test-Path -LiteralPath $Path)) {
+            return ''
+        }
+        try {
+            return (Get-Content -LiteralPath $Path -Tail 32 -ErrorAction SilentlyContinue | Out-String)
+        }
+        catch {
+            return ''
+        }
+    }
+
+    $tid = [Guid]::NewGuid().ToString('n')
+    $outF = Join-Path $env:TEMP "privateai-docker-pull-$tid.out"
+    $errF = Join-Path $env:TEMP "privateai-docker-pull-$tid.err"
+    Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+
+    $dir = Split-Path -Parent $DockerExePath
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct 8 -Detail 'Docker pull'
+
+    $proc = $null
+    try {
+        $proc = Start-Process -FilePath $DockerExePath -WorkingDirectory $dir `
+            -ArgumentList @('pull', $Image) `
+            -PassThru -NoNewWindow `
+            -RedirectStandardOutput $outF `
+            -RedirectStandardError $errF
+    }
+    catch {
+        Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+        return @{ ExitCode = -1; Output = [string]$_.Exception.Message }
+    }
+
+    if ($null -eq $proc) {
+        Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+        return @{ ExitCode = -2; Output = 'Start-Process returned null.' }
+    }
+
+    $lastPct = $null
+    while (-not $proc.HasExited) {
+        $proc.Refresh()
+        Start-Sleep -Milliseconds 360
+        $blob = "$(Read-Tails -Path $outF)`n$(Read-Tails -Path $errF)"
+
+        try {
+            $best = $null
+            foreach ($m in ([regex]::Matches($blob, '\b(\d+(?:\.\d+)?)%'))) {
+                $n = [double]$m.Groups[1].Value
+                if ($null -eq $best -or $n -gt $best) { $best = $n }
+            }
+            if (($null -ne $best) -and ($best -ge 0)) {
+                $pClamped = [int][Math]::Min(99, [Math]::Max(8, [Math]::Floor($best)))
+                Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct $pClamped -Detail $Image
+                $lastPct = $pClamped
+            }
+            else {
+                $lines = @(($blob -split '\r?\n') | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Trim()) })
+                $lastLn = ''
+                if ($lines.Count -gt 0) { $lastLn = [string]$lines[$lines.Count - 1].Trim() }
+                if ($lastLn.Length -gt 0) {
+                    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct $lastPct -Detail $lastLn
+                }
+            }
+        }
+        catch { }
+    }
+
+    try {
+        $null = $proc.WaitForExit()
+    }
+    catch { }
+
+    $exit = 1
+    try {
+        $exit = [int]$proc.ExitCode
+    }
+    catch { }
+
+    $merged = ''
+    foreach ($f in @($outF, $errF)) {
+        if (Test-Path -LiteralPath $f) {
+            try {
+                $merged += "`n" + [System.IO.File]::ReadAllText($f)
+            }
+            catch { }
+        }
+    }
+    $merged = $merged.Trim()
+    if ($merged.Length -gt $OutputCharLimit) {
+        $merged = $merged.Substring(0, $OutputCharLimit) + '…'
+    }
+
+    if ($exit -eq 0) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct 100 -Detail $Image
+    }
+
+    Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+    return @{ ExitCode = [int]$exit; Output = [string]$merged }
+}
+
+<#
+    Same technique as Invoke-PrivateAIDockerPullWithProgress: avoid piping ollama.exe under
+    $ErrorActionPreference Stop (stderr/progress lines can surface as terminating errors).
+#>
+function Invoke-PrivateAIOllamaPullWithProgress {
+    param(
+        [Parameter(Mandatory)][string]$OllamaExePath,
+        [Parameter(Mandatory)][string]$Model,
+        [string]$ProgressFile = '',
+        [int]$OutputCharLimit = 12000
+    )
+
+    function Read-PullLogSnippet {
+        param(
+            [string]$Path1,
+            [string]$Path2,
+            [int]$TailChars = 24000
+        )
+        $blob = ''
+        foreach ($path in @($Path1, $Path2)) {
+            if ([string]::IsNullOrWhiteSpace($path) -or -not (Test-Path -LiteralPath $path)) {
+                continue
+            }
+            try {
+                $blob += "`n" + [System.IO.File]::ReadAllText($path)
+            }
+            catch { }
+        }
+        # Ollama redraws one line with CR; normalize so regex sees all % tokens written so far.
+        $norm = (($blob -replace "`r`n", "`n").Replace("`r", "`n")).Trim()
+        if ($norm.Length -gt $TailChars) {
+            return $norm.Substring($norm.Length - $TailChars)
+        }
+        return $norm
+    }
+
+    function Get-MaxPercentFromBlob {
+        param([string]$Blob)
+        $best = $null
+        foreach ($m in ([regex]::Matches($Blob, '(?<!\d)(\d+(?:\.\d+)?)\s*%'))) {
+            try {
+                $n = [double]$m.Groups[1].Value
+                if (($n -lt 0) -or ($n -gt 100)) { continue }
+                if ($null -eq $best -or $n -gt $best) { $best = $n }
+            }
+            catch { }
+        }
+        return $best
+    }
+
+    $tid = [Guid]::NewGuid().ToString('n')
+    $outF = Join-Path $env:TEMP "privateai-ollama-pull-$tid.out"
+    $errF = Join-Path $env:TEMP "privateai-ollama-pull-$tid.err"
+    Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+
+    $dir = Split-Path -Parent $OllamaExePath
+    if ([string]::IsNullOrWhiteSpace($dir)) { $dir = $env:SystemRoot }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct 4 -Detail "Pull $Model"
+
+    $proc = $null
+    try {
+        $proc = Start-Process -FilePath $OllamaExePath -WorkingDirectory $dir `
+            -ArgumentList @('pull', $Model) `
+            -PassThru -NoNewWindow `
+            -RedirectStandardOutput $outF `
+            -RedirectStandardError $errF
+    }
+    catch {
+        Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+        return @{ ExitCode = -1; Output = [string]$_.Exception.Message }
+    }
+
+    if ($null -eq $proc) {
+        Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+        return @{ ExitCode = -2; Output = 'Start-Process returned null.' }
+    }
+
+    $pullT0 = Get-Date
+    $lastPct = $null
+    while (-not $proc.HasExited) {
+        $proc.Refresh()
+        Start-Sleep -Milliseconds 360
+
+        $blob = Read-PullLogSnippet -Path1 $outF -Path2 $errF
+
+        try {
+            $best = Get-MaxPercentFromBlob -Blob $blob
+
+            $elapsed = ((Get-Date) - $pullT0).TotalSeconds
+            # If the CLI never prints a % (TTY progress does not translate to the log), still move the bar.
+            $synthPct = $null
+            if ($null -eq $best) {
+                $synthPct = [int][Math]::Min(94, [Math]::Floor((4 + (($elapsed / 900.0) * 85)))) # ~15 min to upper 80s
+            }
+
+            $pEmit = if ($null -ne $best) {
+                [int][Math]::Min(99, [Math]::Max(4, [Math]::Floor([double]$best)))
+            }
+            else {
+                $synthPct
+            }
+
+            if ($null -ne $pEmit) {
+                $lastPct = $pEmit
+            }
+
+            $lines = @(($blob -split "`n") | Where-Object { -not [string]::IsNullOrWhiteSpace(($_.Trim())) })
+            $lastLn = ''
+            if ($lines.Count -gt 0) { $lastLn = [string]$lines[$lines.Count - 1].Trim() }
+
+            $detailOut = if (-not [string]::IsNullOrWhiteSpace($lastLn)) {
+                if ($lastLn.Length -gt 160) { $lastLn.Substring($lastLn.Length - 160) } else { $lastLn }
+            }
+            else {
+                "Pull $Model"
+            }
+
+            if ($null -ne $pEmit) {
+                Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct $pEmit -Detail $detailOut
+            }
+        }
+        catch { }
+    }
+
+    try {
+        $null = $proc.WaitForExit()
+    }
+    catch { }
+
+    $exit = 1
+    try {
+        $exit = [int]$proc.ExitCode
+    }
+    catch { }
+
+    $merged = ''
+    foreach ($f in @($outF, $errF)) {
+        if (Test-Path -LiteralPath $f) {
+            try {
+                $merged += "`n" + [System.IO.File]::ReadAllText($f)
+            }
+            catch { }
+        }
+    }
+    $merged = $merged.Trim()
+    if ($merged.Length -gt $OutputCharLimit) {
+        $merged = $merged.Substring(0, $OutputCharLimit) + '…'
+    }
+
+    if ($exit -eq 0) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase download -Pct 100 -Detail $Model
+    }
+
+    Remove-Item -LiteralPath $outF, $errF -Force -ErrorAction SilentlyContinue
+    return @{ ExitCode = [int]$exit; Output = [string]$merged }
+}
+
+<#
     Runs `docker version --format '{{.Server.Version}}'` without tripping NativeCommandError under
     $ErrorActionPreference Stop. Returns trimmed server version text, or $null if the engine is not ready.
 #>
@@ -217,16 +670,48 @@ function Get-PrivateAIDockerServerVersion {
         [Parameter(Mandatory)][string]$DockerExePath,
         [int]$OutputCharLimit = 4000
     )
-    $r = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
-        -ArgList @('version', '--format', '{{.Server.Version}}') `
-        -OutputCharLimit $OutputCharLimit
-    if (($null -eq $r) -or ([int]$r.ExitCode -ne 0)) {
+
+    function Read-FirstNonEmptyLine {
+        param([string]$Text)
+        foreach ($line in ($Text -split "`n")) {
+            $trim = $line.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($trim)) { return $trim }
+        }
         return $null
     }
-    foreach ($line in (([string]$r.Output) -split "`n")) {
-        $trim = $line.Trim()
-        if (-not [string]::IsNullOrWhiteSpace($trim)) {
-            return $trim
+
+    $rFmt = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
+        -ArgList @('version', '--format', '{{.Server.Version}}') `
+        -OutputCharLimit $OutputCharLimit
+    if (($null -ne $rFmt) -and ([int]$rFmt.ExitCode -eq 0)) {
+        $line = Read-FirstNonEmptyLine -Text ([string]$rFmt.Output)
+        if (-not [string]::IsNullOrWhiteSpace($line)) { return $line }
+    }
+
+    $rInfo = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
+        -ArgList @('info', '--format', '{{.ServerVersion}}') `
+        -OutputCharLimit $OutputCharLimit
+    if (($null -ne $rInfo) -and ([int]$rInfo.ExitCode -eq 0)) {
+        $line = Read-FirstNonEmptyLine -Text ([string]$rInfo.Output)
+        if (-not [string]::IsNullOrWhiteSpace($line)) { return $line }
+    }
+
+    $rVer = Invoke-PrivateAIDocker -DockerExePath $DockerExePath `
+        -ArgList @('version') `
+        -OutputCharLimit $OutputCharLimit
+    if (($null -eq $rVer) -or ([int]$rVer.ExitCode -ne 0)) {
+        return $null
+    }
+    $txt = [string]$rVer.Output
+    $needle = "`nServer:"
+    $p = $txt.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase)
+    if ($p -lt 0) {
+        $p = $txt.IndexOf('Server:', [System.StringComparison]::OrdinalIgnoreCase)
+    }
+    if ($p -ge 0) {
+        $tail = $txt.Substring($p)
+        if ($tail -match '(?m)Version:\s*([0-9][0-9A-Za-z._\-]*)') {
+            return [string]$Matches[1]
         }
     }
     return $null

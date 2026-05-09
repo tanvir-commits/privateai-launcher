@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
-import Home from './pages/Home'
+import Dashboard from './pages/Dashboard'
 import HardwareDoctor from './pages/HardwareDoctor'
 import InstallWizard from './pages/InstallWizard'
 import Models from './pages/Models'
@@ -12,13 +12,13 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">PrivateAI Launcher</div>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/">
-          Home
+          Dashboard
         </NavLink>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/hardware">
           Hardware Doctor
         </NavLink>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/install">
-          Install Wizard
+          Install
         </NavLink>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/models">
           Models
@@ -32,7 +32,7 @@ export default function App() {
       </aside>
       <main className="content">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/hardware" element={<HardwareDoctor />} />
           <Route path="/install" element={<InstallWizard />} />
           <Route path="/models" element={<Models />} />

@@ -34,7 +34,8 @@ const COMMON: { code: string; title: string; hint: string }[] = [
   {
     code: 'OPENWEBUI_CONTAINER_STOPPED',
     title: 'Open WebUI container stopped',
-    hint: 'Repairs recreate or start the Docker container on port 3000.'
+    hint:
+      'Runs docker start on privateai-open-webui, or on another container publishing your Open WebUI port if the name differs. If Docker Desktop shows HTTP 304 when starting, fully quit Docker Desktop (tray icon) and reopen, then retry.'
   },
   {
     code: 'OPENWEBUI_CANNOT_REACH_OLLAMA',

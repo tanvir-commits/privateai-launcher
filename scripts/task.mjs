@@ -59,6 +59,21 @@ function verifyScriptsParse() {
   ).status ?? 1
 }
 
+function verifyStack(extraArgs = []) {
+  return spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(root, 'scripts/windows/verify-local-stack.ps1'),
+      ...extraArgs
+    ],
+    { cwd: root, stdio: 'inherit' }
+  ).status ?? 1
+}
+
 function vitest() {
   die(vitestRun())
 }
@@ -121,13 +136,23 @@ switch (name) {
   case 'verify-ps-parse':
     die(verifyScriptsParse())
     break
+  case 'verify:stack':
+    die(verifyStack())
+    break
+  case 'verify:dev':
+    die(verifyStack(['-StartDev']))
+    break
+  case 'verify:full':
+    if (verifyStack() !== 0) die(1)
+    die(vitestRun())
+    break
   case 'test:all':
     testAll()
     break
   default:
     console.error(`Unknown task: ${name ?? '(none)'}`)
     console.error(
-      'Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|verify-ps-parse|test:ps|test:all|test:e2e|test:e2e:ci>'
+      'Usage: node scripts/task.mjs <dev|build|preview|typecheck|test|verify-ps-parse|verify:stack|verify:dev|verify:full|test:ps|test:all|test:e2e|test:e2e:ci>'
     )
     die(1)
 }

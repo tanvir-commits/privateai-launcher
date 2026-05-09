@@ -1,6 +1,12 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 18 -Detail 'Checking Ollama API'
+
     $ports = Get-PortsConfig
     $port = [int]$ports.ollama
     $exe = Get-OllamaExecutablePath
@@ -26,18 +32,21 @@ try {
             $warnings += 'Ollama was not running; PrivateAI started it in the background for you.'
         }
 
+        $ov = $(if ($null -eq $exe) { $null } else { Get-PrivateAIOllamaVersionLine $exe })
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Ollama is reachable.' -Details @{
-            port         = $port
-            url          = "http://localhost:$port"
-            models       = $Models
-            ollamaExe    = $exe
-            autoStarted  = [bool]$AutoStarted
+            port          = $port
+            url           = "http://localhost:$port"
+            models        = $Models
+            ollamaExe     = $exe
+            autoStarted   = [bool]$AutoStarted
+            ollamaVersion = $ov
         } -Warnings $warnings
         Write-Output (Write-ScriptJson $payload)
     }
 
     try {
         $models = Get-TagsPayload -ListenPort $port
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'Ollama answered'
         Write-OllamaSuccess -Models $models -AutoStarted $false
         exit 0
     }
@@ -56,9 +65,15 @@ try {
 
         Start-PrivateAIOllamaIfInstalled
 
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase starting -Pct 32 -Detail 'Wake Ollama, waiting for API'
+
         $models2 = $null
         $deadline = (Get-Date).AddSeconds(90)
+        $wakeStarted = Get-Date
         while ((Get-Date) -lt $deadline) {
+            $elapsed = ((Get-Date) - $wakeStarted).TotalSeconds
+            $pct = [int][Math]::Min(94, [Math]::Floor((32 + ($elapsed / [double]90) * 64)))
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase starting -Pct $pct -Detail 'Waiting for Ollama HTTP'
             Start-Sleep -Seconds 2
             try {
                 $models2 = Get-TagsPayload -ListenPort $port
@@ -68,6 +83,7 @@ try {
         }
 
         if ($null -ne $models2) {
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'Ollama answered'
             Write-OllamaSuccess -Models $models2 -AutoStarted $true
             exit 0
         }

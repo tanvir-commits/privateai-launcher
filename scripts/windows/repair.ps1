@@ -91,14 +91,45 @@ function Repair-DockerEngineWindows {
     if ($eng.desktopLaunched) {
         $msg = 'Started com.docker.service and launched Docker Desktop.'
     }
-    return New-ScriptResult -Ok $true -Status success -Message $msg -Details @{ dockerEngine = $eng }
+
+    $ow = Start-PrivateAIOpenWebUiContainerIfStopped
+    $details = @{ dockerEngine = $eng; openWebUiContainer = $ow }
+    if ($ow.action -eq 'started') {
+        $msg = "$msg Also started the Open WebUI container (privateai-open-webui)."
+    }
+    elseif ($ow.action -eq 'start_failed' -or $ow.action -eq 'error') {
+        return New-ScriptResult -Ok $true -Status warning -Message ($msg + ' Engine is up, but the Open WebUI container could not be started automatically; use Dashboard Restart on Open WebUI or the play button in Docker Desktop.') -Details $details -Warnings @(
+            'Open WebUI container start failed after engine repair; see openWebUiContainer in details.'
+        )
+    }
+
+    return New-ScriptResult -Ok $true -Status success -Message $msg -Details $details
 }
 
 function Repair-OpenWebuiContainer {
-    $name = 'privateai-open-webui'
-    $start = Invoke-PrivateAIDocker -ArgList @('start', $name) -OutputCharLimit 2000
+    $preferred = 'privateai-open-webui'
+    $dockerExe = Get-DockerExecutablePath
+    if ([string]::IsNullOrWhiteSpace($dockerExe)) {
+        return New-ScriptResult -Ok $false -Status warning -Message 'docker.exe not found; cannot start Open WebUI.' -Details @{} -Errors @(
+            [pscustomobject]@{ code = 'OPENWEBUI_CONTAINER_STOPPED'; message = 'docker missing' }
+        )
+    }
+    $ports = Get-PortsConfig
+    $hp = [int]$ports.openWebui
+    $name = $preferred
+    $exists = Invoke-PrivateAIDocker -DockerExePath $dockerExe -ArgList @('inspect', '-f', '{{.Id}}', $name) -OutputCharLimit 800
+    if ($exists.ExitCode -ne 0) {
+        $alt = Resolve-PrivateAIOpenWebUiContainerName -DockerExePath $dockerExe -HostPort $hp
+        if ([string]::IsNullOrWhiteSpace($alt)) {
+            return New-ScriptResult -Ok $false -Status warning -Message 'No Open WebUI container found for this engine (expected privateai-open-webui or an image publishing the configured port). Re-run install-openwebui.ps1.' -Details @{ preferred = $preferred; publishPort = $hp } -Errors @(
+                [pscustomobject]@{ code = 'OPENWEBUI_CONTAINER_STOPPED'; message = 'container not found' }
+            )
+        }
+        $name = $alt
+    }
+    $start = Invoke-PrivateAIDocker -DockerExePath $dockerExe -ArgList @('start', $name) -OutputCharLimit 2000
     if ($start.ExitCode -ne 0) {
-        return New-ScriptResult -Ok $false -Status warning -Message 'Could not start Open WebUI container automatically. Re-run install-openwebui.ps1.' -Details @{ container = $name } -Errors @(
+        return New-ScriptResult -Ok $false -Status warning -Message 'Could not start Open WebUI container automatically. If Docker Desktop shows error 304, fully quit Docker Desktop and reopen it, then try again.' -Details @{ container = $name; dockerOutputTail = (Get-PrivateAITailText $start.Output 2000) } -Errors @(
             [pscustomobject]@{ code = 'OPENWEBUI_CONTAINER_STOPPED'; message = 'docker start failed' }
         )
     }

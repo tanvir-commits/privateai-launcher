@@ -1,17 +1,35 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 function Wait-PrivateAIDockerEngineVersion {
     param(
         [Parameter(Mandatory)][string]$DockerExePath,
         [int]$DeadlineSeconds = 150,
-        [int]$IntervalSeconds = 10
+        [int]$IntervalSeconds = 10,
+        [string]$ProgressFileInner = '',
+        [string]$ProgressDetail = 'Docker engine warming up'
     )
     $until = (Get-Date).AddSeconds($DeadlineSeconds)
+    $started = Get-Date
     while ((Get-Date) -lt $until) {
         $v = Get-PrivateAIDockerServerVersion -DockerExePath $DockerExePath
         if (-not [string]::IsNullOrWhiteSpace($v)) {
             return [string]$v
         }
+        try {
+            $elapsed = ((Get-Date) - $started).TotalSeconds
+            $pct = [int][Math]::Min(
+                94,
+                [Math]::Floor(($elapsed / [double]([Math]::Max(10, $DeadlineSeconds))) * 100)
+            )
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFileInner -Phase check `
+                -Pct $pct `
+                -Detail $ProgressDetail
+        }
+        catch { }
         Start-Sleep -Seconds $IntervalSeconds
     }
     return $null
@@ -27,9 +45,13 @@ try {
         exit 1
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 10 -Detail 'First engine probe'
+
     # Cold start / post-WSL-reset: linuxEngine named pipe often returns HTTP 500 for ~1–3 minutes while VM boots.
-    $version = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 150 -IntervalSeconds 10
+    $version = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 150 -IntervalSeconds 10 `
+        -ProgressFileInner $ProgressFile -ProgressDetail 'Waiting for Docker engine (initial)'
     if (-not [string]::IsNullOrWhiteSpace($version)) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 100 -Detail 'Engine responded'
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is installed and responding.' -Details @{
             serverVersion = [string]$version
             dockerExe     = [string]$dockerExe
@@ -48,11 +70,15 @@ try {
         'Docker server version unavailable after initial wait.'
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 55 -Detail 'Refreshing WSL, then retry'
+
     $wslHeal = Update-PrivateAIWslInPlace
     Stop-PrivateAIWsl
     Start-Sleep -Seconds 3
-    $version2 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 90 -IntervalSeconds 8
+    $version2 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 90 -IntervalSeconds 8 `
+        -ProgressFileInner $ProgressFile -ProgressDetail 'After WSL refresh'
     if (-not [string]::IsNullOrWhiteSpace($version2)) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 100 -Detail 'Engine responded'
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker is responding after WSL refresh.' -Details @{
             serverVersion = [string]$version2
             dockerExe     = [string]$dockerExe
@@ -62,9 +88,13 @@ try {
         exit 0
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 75 -Detail 'Trying Docker Windows service'
+
     $dockEng = Start-PrivateAIDockerWindowsEngine
-    $version3 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 120 -IntervalSeconds 10
+    $version3 = Wait-PrivateAIDockerEngineVersion -DockerExePath $dockerExe -DeadlineSeconds 120 -IntervalSeconds 10 `
+        -ProgressFileInner $ProgressFile -ProgressDetail 'After service/desktop start'
     if (-not [string]::IsNullOrWhiteSpace($version3)) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase check -Pct 100 -Detail 'Engine responded'
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Docker responded after starting Docker Desktop service / app.' -Details @{
             serverVersion = [string]$version3
             dockerExe     = [string]$dockerExe

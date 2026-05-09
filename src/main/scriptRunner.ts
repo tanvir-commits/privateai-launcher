@@ -109,6 +109,8 @@ async function runPowerShellScriptElevated(input: {
   const tmpDir = join(os.tmpdir(), 'privateai-launcher', randomUUID())
   const outFile = join(tmpDir, 'stdout.txt')
   const errFile = join(tmpDir, 'stderr.txt')
+  const childStdoutFile = join(tmpDir, 'elev-child-stdout.txt')
+  const childStderrFile = join(tmpDir, 'elev-child-stderr.txt')
   const innerExitFile = join(tmpDir, 'inner-exit.txt')
   const outerExitFile = join(tmpDir, 'outer-exit.txt')
   const outerErrFile = join(tmpDir, 'outer-launch.txt')
@@ -121,17 +123,36 @@ async function runPowerShellScriptElevated(input: {
       ? join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
       : 'powershell.exe'
 
-  const invokeLine = buildScriptInvokeExpression(scriptPath, args)
+  const childArgListPs = buildPsArgs(scriptPath, args)
+    .map((a) => `'${escapePsSingleQuoted(a)}'`)
+    .join(',')
 
   const innerScript = [
     '$ErrorActionPreference = "Continue"',
     '$utf8NoBom = New-Object System.Text.UTF8Encoding $false',
     'try {',
-    `  $output = ${invokeLine} 2>&1 | ForEach-Object { $_.ToString() }`,
-    '  $joined = if ($null -eq $output) { \'\' } elseif ($output -is [System.Array]) { $output -join [Environment]::NewLine } else { [string]$output }',
-    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(outFile)}', $joined, $utf8NoBom)`,
-    '  $ec = $LASTEXITCODE',
-    '  if ($null -eq $ec) { $ec = 0 }',
+    // Elevated pipelines (*>&1 | Out-String) can still deadlock on merged streams after the script
+    // finishes work (Docker check hits 100% while IPC never completes). Spawn a nested powershell.exe
+    // with stdout/stderr redirected to temp files instead.
+    `  Remove-Item -LiteralPath '${escapePsSingleQuoted(childStdoutFile)}','${escapePsSingleQuoted(childStderrFile)}' -Force -ErrorAction SilentlyContinue`,
+    `  $spawnArgs = @{`,
+    `    FilePath                 = '${escapePsSingleQuoted(psExe)}'`,
+    `    ArgumentList             = @(${childArgListPs})`,
+    `    Wait                     = $true`,
+    `    PassThru                 = $true`,
+    `    NoNewWindow              = $true`,
+    // Omit UseShellExecute: Windows PowerShell 5.1 (elevated child is powershell.exe) has no such parameter; PS 6+ added it.
+    `    RedirectStandardOutput   = '${escapePsSingleQuoted(childStdoutFile)}'`,
+    `    RedirectStandardError    = '${escapePsSingleQuoted(childStderrFile)}'`,
+    `  }`,
+    `  $p = Start-Process @spawnArgs`,
+    `  $outRaw = if (Test-Path -LiteralPath '${escapePsSingleQuoted(childStdoutFile)}') { [System.IO.File]::ReadAllText('${escapePsSingleQuoted(childStdoutFile)}') } else { '' }`,
+    `  $errRaw = if (Test-Path -LiteralPath '${escapePsSingleQuoted(childStderrFile)}') { [System.IO.File]::ReadAllText('${escapePsSingleQuoted(childStderrFile)}') } else { '' }`,
+    // Do not merge stderr into stdout: winget/docker/DISM flood stderr and break JSON parsing (INVALID_SCRIPT_OUTPUT).
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(outFile)}', $outRaw, $utf8NoBom)`,
+    `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(errFile)}', $errRaw, $utf8NoBom)`,
+    '  $ec = 0',
+    '  if ($null -ne $p.ExitCode) { $ec = [int]$p.ExitCode }',
     `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(innerExitFile)}', "$ec", $utf8NoBom)`,
     '} catch {',
     `  [System.IO.File]::WriteAllText('${escapePsSingleQuoted(errFile)}', ($_ | Out-String), $utf8NoBom)`,
@@ -274,20 +295,6 @@ async function runPowerShellScriptElevated(input: {
 
 function escapePsSingleQuoted(v: string): string {
   return v.replaceAll("'", "''")
-}
-
-/** Builds `& 'path\to\script.ps1' -Key 'value' ...` for use inside elevated wrapper. */
-function buildScriptInvokeExpression(
-  scriptPath: string,
-  args?: Record<string, string | number | boolean>
-): string {
-  const parts = [`& '${escapePsSingleQuoted(scriptPath)}'`]
-  if (args) {
-    for (const [k, v] of Object.entries(args)) {
-      parts.push(`-${k}`, `'${escapePsSingleQuoted(String(v))}'`)
-    }
-  }
-  return parts.join(' ')
 }
 
 async function readTextSafe(path: string): Promise<string> {

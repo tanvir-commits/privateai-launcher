@@ -1,5 +1,6 @@
 param(
-    [string]$LogDir = ''
+    [string]$LogDir = '',
+    [string]$ProgressFile = ''
 )
 
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
@@ -17,6 +18,8 @@ function Write-LogLine {
 }
 
 try {
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 12 -Detail 'Gathering hardware and OS'
+
     $os = Get-CimInstance Win32_OperatingSystem
     $cs = Get-CimInstance Win32_ComputerSystem
 
@@ -28,6 +31,8 @@ try {
     if ($null -ne $cDrive) {
         $diskFree = [int64]$cDrive.Free
     }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 48 -Detail 'Checking ports and virtualization'
 
     $ports = Get-PortsConfig
     $portChecks = [ordered]@{}
@@ -110,6 +115,8 @@ try {
 
     $msg = 'System scan complete.'
     Write-LogLine $msg
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'Done'
 
     $payload = New-ScriptResult -Ok $true -Status success -Message $msg -Details ([pscustomobject]$details) -Warnings $warnings
     Write-Output (Write-ScriptJson $payload)

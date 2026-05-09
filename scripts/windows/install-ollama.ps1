@@ -1,10 +1,17 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
     $exe0 = Get-OllamaExecutablePath
     if ($null -ne $exe0) {
+        $ov0 = Get-PrivateAIOllamaVersionLine $exe0
         $payload = New-ScriptResult -Ok $true -Status success -Message 'Ollama is already installed.' -Details @{
-            path = [string]$exe0
+            path                   = [string]$exe0
+            ollamaVersion          = $ov0
+            alreadyInstalledProbe  = $true
         }
         Write-Output (Write-ScriptJson $payload)
         exit 0
@@ -33,23 +40,51 @@ try {
         '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'
     )
 
-    function Invoke-WingetInstallOllama {
-        param([string[]]$ArgumentList)
-        return (Start-Process -FilePath 'winget.exe' -ArgumentList $ArgumentList -Wait -PassThru -NoNewWindow)
+    function Wait-WingetInstallOllamaProgress {
+        param(
+            [Parameter(Mandatory)][string[]]$ArgumentList,
+            [ValidateRange(0, 99)][int]$PctFrom,
+            [ValidateRange(1, 100)][int]$PctTo,
+            [string]$Detail,
+            [double]$RampSeconds = 2100.0
+        )
+        $p = Start-Process -FilePath 'winget.exe' -ArgumentList $ArgumentList -PassThru -NoNewWindow
+        if ($null -eq $p) { return }
+        $t0 = Get-Date
+        while (-not $p.HasExited) {
+            $p.Refresh()
+            $el = ((Get-Date) - $t0).TotalSeconds
+            $span = [Math]::Min(1.0, $el / [Math]::Max(60.0, $RampSeconds))
+            $pct = [int][Math]::Min($PctTo, [Math]::Floor($PctFrom + $span * ([double]($PctTo - $PctFrom))))
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase winget -Pct $pct -Detail $Detail
+            Start-Sleep -Seconds 2
+        }
+        try {
+            $null = $p.WaitForExit()
+        }
+        catch { }
     }
 
-    $null = Invoke-WingetInstallOllama -ArgumentList $silent
+    Wait-WingetInstallOllamaProgress -ArgumentList $silent -PctFrom 5 -PctTo 58 `
+        -Detail 'winget: downloading & installing Ollama (no real % from installer)'
+
     Start-Sleep -Seconds 5
     if ($null -eq (Get-OllamaExecutablePath)) {
         Start-Sleep -Seconds 25
         if ($null -eq (Get-OllamaExecutablePath)) {
-            # Some builds ignore --silent; try a minimally interactive winget invocation once more.
-            $null = Invoke-WingetInstallOllama -ArgumentList $shown
+            Wait-WingetInstallOllamaProgress -ArgumentList $shown -PctFrom 20 -PctTo 60 `
+                -Detail 'winget: retry with minimal UI'
         }
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct 65 -Detail 'Waiting for installer to finish copying files'
+
     $deadExe = (Get-Date).AddMinutes(18)
+    $exeWait0 = Get-Date
     while ($null -eq (Get-OllamaExecutablePath) -and ((Get-Date) -lt $deadExe)) {
+        $elapsed = ((Get-Date) - $exeWait0).TotalSeconds
+        $pct = [int][Math]::Min(90, [Math]::Floor((65 + ($elapsed / 1080 * 22)))) # up to ~22 points over ~18min
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase install -Pct $pct -Detail 'Searching for Ollama after install'
         Start-Sleep -Seconds 3
     }
 
@@ -65,12 +100,15 @@ try {
         exit 1
     }
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase starting -Pct 92 -Detail 'Starting Ollama'
+
     Start-PrivateAIOllamaIfInstalled
 
     $ports = Get-PortsConfig
     $listen = [int]$ports.ollama
     $apiOk = $false
     $apiDeadline = (Get-Date).AddSeconds(120)
+    $api0 = Get-Date
     while ((Get-Date) -lt $apiDeadline) {
         try {
             $null = Invoke-WebRequest -Uri "http://127.0.0.1:$listen/api/tags" -UseBasicParsing -TimeoutSec 5
@@ -78,9 +116,14 @@ try {
             break
         }
         catch {
+            $aEl = ((Get-Date) - $api0).TotalSeconds
+            $aPct = [int][Math]::Min(98, [Math]::Floor((92 + ($aEl / 120 * 6))))
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase starting -Pct $aPct -Detail 'Waiting for Ollama API'
             Start-Sleep -Milliseconds 750
         }
     }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase starting -Pct 100 -Detail 'Ollama ready'
 
     $warnings = @()
     if (-not $apiOk) {
@@ -88,6 +131,7 @@ try {
     }
 
     $st = if ($warnings.Count -gt 0) { 'warning' } else { 'success' }
+    $ov = Get-PrivateAIOllamaVersionLine $exe
     $payload = New-ScriptResult -Ok $true -Status $st -Message $(if ($apiOk) {
             'Ollama was installed and the API responded.'
         }
@@ -98,6 +142,7 @@ try {
         installMethod = 'winget'
         apiReady      = [bool]$apiOk
         port          = $listen
+        ollamaVersion = $ov
     } -Warnings @($warnings)
 
     Write-Output (Write-ScriptJson $payload)

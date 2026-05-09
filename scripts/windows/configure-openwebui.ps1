@@ -1,9 +1,17 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase configure -Pct 40 -Detail 'Compose hints'
+
     $ports = Get-PortsConfig
     $ollamaPort = [int]$ports.ollama
     $owPort = [int]$ports.openWebui
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase configure -Pct 100 -Detail 'Done'
 
     $payload = New-ScriptResult -Ok $true -Status success -Message 'Open WebUI should use host.docker.internal for Ollama when running in Docker.' -Details @{
         suggestedOllamaUrl = "http://host.docker.internal:$ollamaPort"

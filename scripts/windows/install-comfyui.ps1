@@ -1,12 +1,19 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 try {
     $ports = Get-PortsConfig
     $port = [int]$ports.comfyui
 
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 35 -Detail "Probe localhost:$port"
+
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -UseBasicParsing -TimeoutSec 3
         if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
+            Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'Comfy reachable'
             $payload = New-ScriptResult -Ok $true -Status success -Message 'ComfyUI appears to be running.' -Details @{
                 url = "http://localhost:$port"
             }
@@ -15,6 +22,8 @@ try {
         }
     }
     catch { }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'Optional — not detected'
 
     # Probe-only: not installed is normal unless the user opted into Comfy workflows.
     # ok=true success + no warnings so optional wizard steps stay green until Comfy answers on the port.

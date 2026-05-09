@@ -1,4 +1,4 @@
-import { defaultDashboardStatus, type DashboardStatus } from '@shared/dashboardTypes'
+import { defaultDashboardStatus, type DashboardStatus, type ServiceState } from '@shared/dashboardTypes'
 import type { ScriptResult } from '@shared/scriptContract'
 import { runPowerShellScript } from './scriptRunner'
 
@@ -17,6 +17,41 @@ export function getDashboardStatus(): DashboardStatus {
 
 export function setDashboardStatus(patch: Partial<DashboardStatus>): void {
   dashboard = { ...dashboard, ...patch }
+}
+
+/** Applies health-check.ps1 JSON to the in-memory dashboard (service dots + LAN URL). */
+export function mergeHealthIntoDashboard(r: ScriptResult): void {
+  const d = r.details as Record<string, unknown> | undefined
+  const phone = d?.phoneAccess as Record<string, unknown> | undefined
+  const url = typeof phone?.url === 'string' ? phone.url : ''
+  const dock = d?.docker as Record<string, unknown> | undefined
+  const ollama = d?.ollama as Record<string, unknown> | undefined
+  const ow = d?.openWebui as Record<string, unknown> | undefined
+  const comfy = d?.comfyui as Record<string, unknown> | undefined
+
+  const dockerVer =
+    typeof dock?.version === 'string' && dock.version.trim().length > 0 ? String(dock.version).trim() : null
+
+  const openWebuiState = ((): ServiceState => {
+    const httpOk = ow?.httpProbeOk === true
+    if (httpOk) return 'running'
+    const cs = typeof ow?.containerState === 'string' ? ow.containerState : ''
+    if (cs === 'running') return 'starting'
+    if (cs === 'stopped') return 'stopped'
+    if (cs === 'missing' || cs === 'no_docker') return 'stopped'
+    return 'unknown'
+  })()
+
+  setDashboardStatus({
+    lastHealthAt: new Date().toISOString(),
+    lastHealthSummary: r.message,
+    lanChatUrl: url || '',
+    docker: typeof dock?.running === 'boolean' ? (dock.running ? 'running' : 'stopped') : 'unknown',
+    dockerVersion: dockerVer,
+    ollama: typeof ollama?.running === 'boolean' ? (ollama.running ? 'running' : 'stopped') : 'unknown',
+    openWebui: openWebuiState,
+    comfyui: typeof comfy?.running === 'boolean' ? (comfy.running ? 'running' : 'stopped') : 'unknown'
+  })
 }
 
 export function getLastHardwareScan(): HardwareScanPayload | null {
@@ -47,6 +82,8 @@ function applyHardwareToDashboard(system: ScriptResult, gpu: ScriptResult): void
     setDashboardStatus({
       readiness: 'unsupported',
       pcReadinessLabel: 'No supported NVIDIA GPU detected',
+      docker: 'unknown',
+      dockerVersion: null,
       ollama: 'unknown',
       openWebui: 'unknown',
       comfyui: 'unknown'
@@ -65,6 +102,8 @@ function applyHardwareToDashboard(system: ScriptResult, gpu: ScriptResult): void
   setDashboardStatus({
     readiness,
     pcReadinessLabel: label,
+    docker: 'unknown',
+    dockerVersion: null,
     ollama: 'unknown',
     openWebui: 'unknown',
     comfyui: 'unknown'

@@ -1,3 +1,7 @@
+param(
+    [string]$ProgressFile = ''
+)
+
 . "$PSScriptRoot\_PrivateAI.Common.ps1"
 
 function Get-GpuFromSmi {
@@ -129,8 +133,13 @@ function Get-ReadinessTier {
 }
 
 try {
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 20 -Detail 'Detecting NVIDIA GPU'
+
     $gpu = Get-GpuFromSmi
-    if ($null -eq $gpu) { $gpu = Get-GpuFromWmi }
+    if ($null -eq $gpu) {
+        Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 52 -Detail 'Trying WMI fallback'
+        $gpu = Get-GpuFromWmi
+    }
 
     $nvidiaPresent = $null -ne $gpu
     $tier = Get-ReadinessTier -NvidiaPresent $nvidiaPresent -VramMb $(if ($null -eq $gpu) { $null } else { $gpu.vramMb })
@@ -158,6 +167,8 @@ try {
         Write-Output (Write-ScriptJson $payload)
         exit 1
     }
+
+    Write-PrivateAIProgressFile -ProgressFile $ProgressFile -Phase checking -Pct 100 -Detail 'GPU scan done'
 
     $payload = New-ScriptResult -Ok $true -Status success -Message 'GPU scan complete.' -Details ([pscustomobject]$details)
     Write-Output (Write-ScriptJson $payload)
