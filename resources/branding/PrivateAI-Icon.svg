@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="PrivateAI Launcher">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="55%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="168" fill="none" stroke="url(#ring)" stroke-width="18" opacity="0.95"/>
+  <circle cx="256" cy="256" r="132" fill="none" stroke="#334155" stroke-width="4" opacity="0.5"/>
+  <!-- network nodes -->
+  <circle cx="178" cy="188" r="28" fill="#22d3ee" filter="url(#glow)"/>
+  <circle cx="334" cy="210" r="28" fill="#a78bfa" filter="url(#glow)"/>
+  <circle cx="220" cy="340" r="28" fill="#34d399" filter="url(#glow)"/>
+  <circle cx="320" cy="320" r="22" fill="#38bdf8" opacity="0.9"/>
+  <path d="M196 200 L318 218 M318 218 L236 328 M196 200 L236 328 M318 218 L312 312" stroke="#e2e8f0" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+  <!-- lock body (privacy) -->
+  <rect x="200" y="268" width="112" height="88" rx="14" fill="#f8fafc" opacity="0.92"/>
+  <path d="M228 268 V232a28 28 0 0 1 56 0v36" fill="none" stroke="#f8fafc" stroke-width="16" stroke-linecap="round" opacity="0.92"/>
+</svg>

@@ -22,6 +22,7 @@
     "test:e2e:ci": "npm run build && playwright test",
     "dist:win": "npm run build && electron-builder --win --config electron-builder.json",
     "dist:win:clean": "npm run build && electron-builder --win --config electron-builder.json --config.directories.output=installer-out",
+    "shortcut:desktop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/create-desktop-shortcut.ps1",
     "go": "node scripts/task.mjs",
     "go:dev": "node scripts/task.mjs dev",
     "go:test": "node scripts/task.mjs test:all",
