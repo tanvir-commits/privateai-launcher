@@ -133,7 +133,13 @@ export default function InstallWizard() {
             idx === i ? (r.ok ? (r.warnings.length ? 'warning' : 'success') : 'error') : v
           )
         )
-        if (!r.ok) break
+        const rebootPause =
+          step.id === 'docker-install' &&
+          r.ok &&
+          typeof r.details === 'object' &&
+          r.details !== null &&
+          (r.details as Record<string, unknown>).rebootRequired === true
+        if (!r.ok || rebootPause) break
       } catch (e) {
         runningScriptRef.current = null
         appendLog(`${step.script} threw: ${String(e)}`)

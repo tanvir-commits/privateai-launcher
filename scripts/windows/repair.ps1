@@ -36,12 +36,10 @@ function Repair-DockerVirtualizationPrereqs {
         )
     }
     if ($r.rebootNeeded) {
-        return New-ScriptResult -Ok $false -Status error -Message 'Features enabled; restart Windows once, then open Docker Desktop or re-run the Install Wizard Docker step.' -Details @{
+        return New-ScriptResult -Ok $true -Status warning -Message 'Features enabled. Restart Windows once, then open Docker Desktop or re-run the Install Wizard.' -Details @{
             prerequisiteLog = @($r.logLines)
             rebootRequired    = $true
-        } -Errors @(
-            [pscustomobject]@{ code = 'REBOOT_REQUIRED_FOR_DOCKER_PREREQS'; message = 'Restart required' }
-        )
+        } -Warnings @('Restart required (DISM 3010) before virtualization is active. This is expected.')
     }
     return New-ScriptResult -Ok $true -Status success -Message 'WSL and Virtual Machine Platform are enabled (no reboot was required by DISM).' -Details @{ prerequisiteLog = @($r.logLines) }
 }

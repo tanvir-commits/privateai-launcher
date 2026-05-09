@@ -29,14 +29,12 @@ try {
         exit 1
     }
     if ($winVirt.rebootNeeded) {
-        $payload = New-ScriptResult -Ok $false -Status error -Message 'Windows applied virtualization features but requires a restart before Docker can start. Restart the PC, then run Install Wizard again from the Docker step.' -Details @{
+        $payload = New-ScriptResult -Ok $true -Status warning -Message 'WSL and Virtual Machine Platform are enabled. Restart the PC once, then click Run install flow again so Docker can finish installing and starting.' -Details @{
             prerequisiteLog = @($winVirt.logLines)
             rebootRequired    = $true
-        } -Errors @(
-            [pscustomobject]@{ code = 'REBOOT_REQUIRED_FOR_DOCKER_PREREQS'; message = 'Restart required after enabling WSL / Virtual Machine Platform.' }
-        )
+        } -Warnings @('Windows requires a restart (DISM 3010) before Docker can use virtualization. This is expected.')
         Write-Output (Write-ScriptJson $payload)
-        exit 1
+        exit 0
     }
 
     $dockerExe = Get-DockerExecutablePath
