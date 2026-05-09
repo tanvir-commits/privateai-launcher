@@ -42,7 +42,8 @@ try {
         }
     }
 
-    $out = & winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1
+    # --silent: suppress winget UI; Docker may still show WSL/backend prompts outside winget on first engine start.
+    $out = & winget install -e --id Docker.DockerDesktop --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1
     $wingetExit = $LASTEXITCODE
     $text = ($out | Out-String)
 
