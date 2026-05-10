@@ -23,21 +23,21 @@ try {
   if ($LASTEXITCODE -ge 8) {
     Write-Error "robocopy failed with exit code $LASTEXITCODE"
   }
-  Push-Location $stageRoot
-  try {
-    $tar = Get-Command tar.exe -ErrorAction SilentlyContinue
-    if ($null -ne $tar) {
-      & tar.exe -a -c -f $zip $folderName
-      if ($LASTEXITCODE -ne 0) {
-        Write-Error "tar.exe failed with exit code $LASTEXITCODE"
-      }
-    }
-    else {
-      Compress-Archive -Path $folderName -DestinationPath $zip -CompressionLevel Optimal -Force
+  # Put files at the root of the .zip (not a parent folder). Otherwise Windows "Extract All"
+  # creates a folder from the .zip name and users end up with PortableName/PortableName/...
+  $tar = Get-Command tar.exe -ErrorAction SilentlyContinue
+  if ($null -ne $tar) {
+    & tar.exe -a -c -f $zip -C $stage .
+    if ($LASTEXITCODE -ne 0) {
+      Write-Error "tar.exe failed with exit code $LASTEXITCODE"
     }
   }
-  finally {
-    Pop-Location
+  else {
+    $items = @(Get-ChildItem -LiteralPath $stage -Force | ForEach-Object { $_.FullName })
+    if ($items.Count -eq 0) {
+      Write-Error "Staging folder is empty: $stage"
+    }
+    Compress-Archive -Path $items -DestinationPath $zip -CompressionLevel Optimal -Force
   }
 }
 finally {

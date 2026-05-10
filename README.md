@@ -6,7 +6,7 @@ PrivateAI Launcher turns a supported Windows NVIDIA PC into a private local AI s
 
 - **Stable link (GitHub):** [Latest release](https://github.com/tanvir-commits/privateai-launcher/releases/latest) — pick **`PrivateAI-Launcher-*-windows-portable.zip`** to unzip and run, or **`*-Setup.exe`** for an installer.
 - **Landing page:** **`https://tanvir-commits.github.io/privateai-launcher/download.html`** — Dashboard screenshot, first-run hint (Check my PC → Install), and live links to the latest release assets. Built by [`pages.yml`](.github/workflows/pages.yml). If Pages was never turned on: **Settings → Pages → Source: GitHub Actions**, or `gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow`.
-- **Ship a release from CI:** push a version tag, e.g. `git tag v1.2.1 && git push origin v1.2.1` — [Release Windows](.github/workflows/release-windows.yml) builds and uploads the zip and installer to that release.
+- **Ship a release from CI:** push a version tag, e.g. `git tag v1.2.2 && git push origin v1.2.2` — [Release Windows](.github/workflows/release-windows.yml) builds and uploads the zip and installer to that release.
 
 Local build + zip: `npm run dist:win:zip` → `release/PrivateAI-Launcher-<version>-windows-portable.zip`.
 
