@@ -8,6 +8,7 @@ const api: PrivateaiApi = {
   getStatus: () => ipcRenderer.invoke('status:get'),
   refreshStatus: () => ipcRenderer.invoke('status:refresh'),
   scanHardware: () => ipcRenderer.invoke('hardware:scan'),
+  getLastHardwareScan: () => ipcRenderer.invoke('hardware:last'),
   runHealth: () => ipcRenderer.invoke('health:run'),
   runScript: (name, args, options) => ipcRenderer.invoke('script:run', { name, args, ...options }),
   runRepair: (code) => ipcRenderer.invoke('repair:run', { code }),

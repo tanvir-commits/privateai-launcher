@@ -7,7 +7,12 @@ import {
   scriptProgressJsonPath,
   subscribeScriptProgressFromFile
 } from './scriptProgressPoll'
-import { getDashboardStatus, mergeHealthIntoDashboard, refreshHardwareScan } from './statusStore'
+import {
+  getDashboardStatus,
+  getLastHardwareScan,
+  mergeHealthIntoDashboard,
+  refreshHardwareScan
+} from './statusStore'
 import { runHealthCheck } from './health'
 import { readWizardInstallState, writeWizardInstallState } from './wizardInstallPersistStore'
 
@@ -34,6 +39,8 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('hardware:scan', async () => refreshHardwareScan())
+
+  ipcMain.handle('hardware:last', async () => getLastHardwareScan())
 
   ipcMain.handle('health:run', async () => {
     const r = await runHealthCheck()

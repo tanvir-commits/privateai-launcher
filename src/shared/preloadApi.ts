@@ -16,6 +16,8 @@ export interface PrivateaiApi {
   /** Runs health check and returns updated dashboard (refreshes service dots). */
   refreshStatus: () => Promise<DashboardStatus>
   scanHardware: () => Promise<HardwareScanPayload>
+  /** Last completed hardware scan (same payload as `scanHardware`) without re-running scripts. */
+  getLastHardwareScan: () => Promise<HardwareScanPayload | null>
   runHealth: () => Promise<ScriptResult>
   runScript: (
     name: string,

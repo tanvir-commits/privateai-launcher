@@ -1,25 +1,45 @@
 {
   "profiles": [
     {
+      "id": "text-3b",
+      "label": "Text chat (small — weak GPU or first try)",
+      "description": "Lightweight tag; good when VRAM is tight or you want a quick download.",
+      "ollamaPull": "llama3.2:3b",
+      "approxSizeGb": 2,
+      "minVramGb": 0,
+      "minRamGb": 8,
+      "requiresNvidia": false
+    },
+    {
       "id": "text-7b",
-      "label": "Text chat (starter)",
-      "description": "General local chat through Ollama.",
+      "label": "Text chat (balanced)",
+      "description": "General local chat through Ollama; better quality if VRAM allows.",
       "ollamaPull": "qwen2.5:7b",
-      "approxSizeGb": 4.5
+      "approxSizeGb": 4.5,
+      "minVramGb": 6,
+      "minRamGb": 8,
+      "cpuFallbackPull": "llama3.2:3b",
+      "requiresNvidia": false
     },
     {
       "id": "vision-7b",
       "label": "Vision / image understanding",
       "description": "Image feedback in chat when VRAM allows.",
       "ollamaPull": "qwen2.5vl:7b",
-      "approxSizeGb": 6
+      "approxSizeGb": 6,
+      "minVramGb": 10,
+      "minRamGb": 8,
+      "requiresNvidia": true
     },
     {
       "id": "image-flux",
       "label": "Image generation (FLUX Schnell FP8)",
       "description": "ComfyUI workflow + checkpoints managed outside Ollama.",
       "ollamaPull": null,
-      "approxSizeGb": 12
+      "approxSizeGb": 12,
+      "minVramGb": 8,
+      "minRamGb": 12,
+      "requiresNvidia": true
     }
   ]
 }

@@ -24,6 +24,7 @@ const mockApi: PrivateaiApi = {
     system: okScript('system'),
     gpu: okScript('gpu')
   }),
+  getLastHardwareScan: async () => null,
   runHealth: async () => okScript('healthy'),
   runScript: async () => okScript('script'),
   runRepair: async () => okScript('repair'),
