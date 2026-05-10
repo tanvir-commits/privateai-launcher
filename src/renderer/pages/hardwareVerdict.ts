@@ -142,7 +142,7 @@ function buildStackLines(params: {
   return lines
 }
 
-/** Interprets Hardware Doctor scan for install guidance (go / caution / hold). */
+/** Interprets Check my PC scan for install guidance (go / caution / hold). */
 export function buildHardwareVerdictView(
   last: HardwareScanPayload,
   sys: ParsedSystemDetails,

@@ -97,7 +97,7 @@ function applyHardwareToDashboard(system: ScriptResult, gpu: ScriptResult): void
       ? String(dGpu.readinessLabel)
       : typeof system.message === 'string'
         ? system.message
-        : 'See Hardware Doctor'
+        : 'See Check my PC'
 
   setDashboardStatus({
     readiness,

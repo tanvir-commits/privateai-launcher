@@ -157,7 +157,7 @@ PrivateAI Launcher Electron App
 │
 ├── React UI
 │   ├── Home
-│   ├── Hardware Doctor
+│   ├── Check my PC
 │   ├── Install Wizard
 │   ├── Models
 │   ├── Services
@@ -233,7 +233,7 @@ privateai-launcher/
 │       │
 │       └── pages/
 │           ├── Home.tsx
-│           ├── HardwareDoctor.tsx
+│           ├── CheckMyPc.tsx
 │           ├── InstallWizard.tsx
 │           ├── Models.tsx
 │           ├── Services.tsx
@@ -312,7 +312,7 @@ http://192.168.1.52:3000
 
 ---
 
-### 2. Hardware Doctor
+### 2. Check my PC
 
 Purpose: determine if machine is supported.
 
@@ -965,7 +965,7 @@ This demo is the viral video.
 v0.1 is acceptable when:
 
 - App launches on Windows.
-- Hardware Doctor detects NVIDIA GPU and VRAM.
+- Check my PC detects NVIDIA GPU and VRAM.
 - App detects unsupported machines gracefully.
 - Ollama install/check works.
 - Open WebUI install/check works.
@@ -993,7 +993,7 @@ Build in this exact order.
 ### Phase 1 — Skeleton App
 
 - Create Electron + React + TypeScript app.
-- Create Home, Hardware Doctor, Install Wizard, Services pages.
+- Create Home, Check my PC, Install Wizard, Services pages.
 - Add fake/mock status data first.
 - Add basic dark UI.
 
@@ -1003,7 +1003,7 @@ Build in this exact order.
 - It should run PowerShell scripts and parse JSON stdout.
 - Show script logs in UI.
 
-### Phase 3 — Hardware Doctor
+### Phase 3 — Check my PC
 
 - Implement `check-system.ps1`.
 - Implement `check-gpu.ps1`.

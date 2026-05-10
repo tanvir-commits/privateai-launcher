@@ -122,11 +122,11 @@ export default function Dashboard() {
     <div>
       <h1 className="page-title">Dashboard</h1>
       <p className="page-sub">
-        Live view of your stack after setup. Use <Link to="/install">Install Wizard</Link> for first-time
-        setup or deep installs. <strong>Restart</strong> on Docker runs engine repair and attempts to start
-        a stopped Open WebUI container; Ollama and Open WebUI cards restart those apps directly.{' '}
-        <strong>Refresh status</strong> re-runs the health probe (can
-        take up to a minute).
+        <strong>New here?</strong> Use <Link to="/check-my-pc">Check my PC</Link> before{' '}
+        <Link to="/install">Install</Link> so you know what fits this machine — then this page becomes your live
+        stack after setup. <strong>Restart</strong> on Docker runs engine repair and attempts to start a stopped Open
+        WebUI container; Ollama and Open WebUI cards restart those apps directly. <strong>Refresh status</strong>{' '}
+        re-runs the health probe (can take up to a minute).
       </p>
 
       {statusProbePending ? (

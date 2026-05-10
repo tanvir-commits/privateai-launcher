@@ -14,7 +14,7 @@ function readinessClass(tier: string | undefined): string {
   return 'ok'
 }
 
-export default function HardwareDoctor() {
+export default function CheckMyPc() {
   const [busy, setBusy] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const [last, setLast] = useState<HardwareScanPayload | null>(null)
@@ -50,10 +50,10 @@ export default function HardwareDoctor() {
 
   return (
     <div>
-      <h1 className="page-title">Hardware Doctor</h1>
+      <h1 className="page-title">Check my PC</h1>
       <p className="page-sub">
-        Tells you what this PC can realistically run before you install anything — green / yellow / red style guidance
-        for Ollama, Open WebUI (Docker), and Comfy — then you continue to Install with eyes open.
+        <strong>Before Install:</strong> scan once for a plain-language verdict (green / yellow / red) on Ollama,
+        Open WebUI (Docker), and Comfy — GPU, RAM, disk, and ports — so you only install what fits this machine.
       </p>
 
       <div className="row-actions">
@@ -71,7 +71,7 @@ export default function HardwareDoctor() {
 
       {!last && !busy ? (
         <p className="muted" style={{ marginTop: 24 }}>
-          Run a scan to get a plain-language verdict, then use Install for the pieces that match your hardware.
+          Run a scan for the verdict and checklist, then continue to Install when you are ready.
         </p>
       ) : null}
 

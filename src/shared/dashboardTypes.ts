@@ -4,7 +4,7 @@ export type ServiceState = 'running' | 'starting' | 'stopped' | 'error' | 'unkno
 export interface DashboardStatus {
   readiness: 'unsupported' | 'basic' | 'recommended' | 'creator' | 'pro' | 'unknown'
   pcReadinessLabel: string
-  /** Linux engine answering (from health check); use Hardware Doctor for GPU readiness. */
+  /** Linux engine answering (from health check); use Check my PC for GPU readiness. */
   docker: ServiceState
   /** Docker Engine / API version when running */
   dockerVersion: string | null

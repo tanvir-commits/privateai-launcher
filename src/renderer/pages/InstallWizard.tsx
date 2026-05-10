@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import modelProfiles from '@config/model-profiles.json'
 import type { ScriptResult } from '@shared/scriptContract'
 import type { ScriptProgressEvent } from '@shared/scriptProgress'
@@ -936,8 +937,9 @@ export default function InstallWizard() {
     <div>
       <h1 className="page-title">Install</h1>
       <p className="page-sub">
-        Core setup probes what is already installed (Ollama, Docker engine, Open WebUI) so installers and
-        UAC run only when needed. Chips show <strong>Installed</strong> vs <strong>Verified</strong> for clarity.
+        Prefer <Link to="/check-my-pc">Check my PC</Link> first for a go / caution verdict on GPU, RAM, disk, and
+        ports. Core setup probes what is already installed (Ollama, Docker engine, Open WebUI) so installers and
+        UAC run only when needed. Chips show <strong>Installed</strong> vs <strong>Verified</strong> for clarity.{' '}
         <strong>Run from here</strong> continues from that row through the rest of core setup (installer for
         that row forces once; probes still apply afterward). Installer scripts can spike CPU/Disk—that is
         expected; progress updates are intentionally throttled to keep the launcher light. Finished steps are
