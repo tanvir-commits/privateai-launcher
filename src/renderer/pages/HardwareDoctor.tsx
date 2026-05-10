@@ -74,7 +74,7 @@ export default function HardwareDoctor() {
         <div className="hw-layout">
           <section className="card hw-card">
             <h3 className="hw-card-title">AI readiness</h3>
-            {gpuOk && gpu.readinessLabel ? (
+            {gpu.readinessLabel ? (
               <>
                 <div className={'hw-readiness ' + readinessClass(gpu.readiness)}>
                   <span className="hw-readiness-dot" />
@@ -83,7 +83,15 @@ export default function HardwareDoctor() {
                 {gpu.readiness ? (
                   <p className="hw-readiness-tier muted">Tier: {gpu.readiness}</p>
                 ) : null}
+                {gpu.readiness === 'unsupported' ? (
+                  <p className="muted hw-note" style={{ marginTop: 12 }}>
+                    No GeForce/RTX GPU was seen by the scan (common on Intel- or AMD-only laptops). Ollama can still run
+                    on CPU; NVIDIA-focused flows in this app may be limited or unsupported.
+                  </p>
+                ) : null}
               </>
+            ) : last.gpu ? (
+              <p className="muted">GPU tier could not be determined. See Graphics below.</p>
             ) : (
               <p className="muted">No GPU result yet. Scan again or check the messages below.</p>
             )}
