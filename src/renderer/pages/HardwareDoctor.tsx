@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { ActionButton } from '../components/ActionButton'
 import { LogPanel } from '../components/LogPanel'
 import type { HardwareScanPayload } from '@shared/preloadApi'
 import { formatBytes, formatPortEntry, formatVramMiB } from '../lib/formatHardware'
+import { buildHardwareVerdictView } from './hardwareVerdict'
 import { parseGpuDetails, parseSystemDetails } from './hardwareTypes'
 
 function readinessClass(tier: string | undefined): string {
@@ -49,7 +51,10 @@ export default function HardwareDoctor() {
   return (
     <div>
       <h1 className="page-title">Hardware Doctor</h1>
-      <p className="page-sub">Validates Windows, NVIDIA GPU, memory, disk, and required ports.</p>
+      <p className="page-sub">
+        Tells you what this PC can realistically run before you install anything — green / yellow / red style guidance
+        for Ollama, Open WebUI (Docker), and Comfy — then you continue to Install with eyes open.
+      </p>
 
       <div className="row-actions">
         <ActionButton variant="primary" disabled={busy} onClick={() => void scan()}>
@@ -66,12 +71,44 @@ export default function HardwareDoctor() {
 
       {!last && !busy ? (
         <p className="muted" style={{ marginTop: 24 }}>
-          Run a scan to see readiness, GPU VRAM, RAM, disk space, and whether default ports are free.
+          Run a scan to get a plain-language verdict, then use Install for the pieces that match your hardware.
         </p>
       ) : null}
 
-      {last ? (
-        <div className="hw-layout">
+      {last && !last.error
+        ? (() => {
+            const v = buildHardwareVerdictView(last, sys, gpu, gpuOk)
+            return (
+              <section className={'card hw-verdict hw-verdict--' + v.kind}>
+                <div className="hw-verdict-badge">{v.badge}</div>
+                <h2 className="hw-verdict-headline">{v.headline}</h2>
+                <p className="hw-verdict-lead">{v.explanation}</p>
+                <ul className="hw-verdict-lines">
+                  {v.lines.map((line) => (
+                    <li key={line.name} className={'hw-verdict-line hw-verdict-line--' + line.status}>
+                      <span className="hw-verdict-line-name">{line.name}</span>
+                      <span className="hw-verdict-line-text">{line.text}</span>
+                    </li>
+                  ))}
+                </ul>
+                {v.footnote ? <p className="muted hw-verdict-foot">{v.footnote}</p> : null}
+                <div className="hw-verdict-actions">
+                  <NavLink to="/install" className="btn btn-primary">
+                    Continue to Install
+                  </NavLink>
+                  <NavLink to="/troubleshooting" className="btn btn-ghost">
+                    Troubleshooting
+                  </NavLink>
+                </div>
+              </section>
+            )
+          })()
+        : null}
+
+      {last && !last.error ? (
+        <>
+          <h2 className="hw-details-title">Scan details</h2>
+          <div className="hw-layout">
           <section className="card hw-card">
             <h3 className="hw-card-title">AI readiness</h3>
             {gpu.readinessLabel ? (
@@ -181,6 +218,13 @@ export default function HardwareDoctor() {
             </p>
           </section>
         </div>
+        </>
+      ) : null}
+
+      {last?.error ? (
+        <p className="muted" style={{ marginTop: 16 }}>
+          Fix the error above, then scan again for a verdict and detailed cards.
+        </p>
       ) : null}
 
       <div className="card" style={{ marginTop: 20 }}>

@@ -205,6 +205,14 @@ a {
   background: transparent;
 }
 
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
 .status-dot {
   display: inline-flex;
   align-items: center;
@@ -313,6 +321,124 @@ a {
 }
 
 /* Hardware Doctor */
+.hw-verdict {
+  margin-top: 20px;
+  padding: 22px 24px 20px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.hw-verdict--go {
+  border-color: rgba(61, 220, 132, 0.45);
+  background: linear-gradient(145deg, rgba(61, 220, 132, 0.09) 0%, var(--surface) 100%);
+}
+
+.hw-verdict--caution {
+  border-color: rgba(230, 184, 77, 0.45);
+  background: linear-gradient(145deg, rgba(230, 184, 77, 0.08) 0%, var(--surface) 100%);
+}
+
+.hw-verdict--hold {
+  border-color: rgba(240, 113, 120, 0.45);
+  background: linear-gradient(145deg, rgba(240, 113, 120, 0.07) 0%, var(--surface) 100%);
+}
+
+.hw-verdict-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.hw-verdict-headline {
+  margin: 0 0 10px;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.hw-verdict-lead {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.95rem;
+  max-width: 62ch;
+}
+
+.hw-verdict-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hw-verdict-line {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr;
+  gap: 10px 16px;
+  align-items: start;
+  font-size: 0.92rem;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+@media (max-width: 560px) {
+  .hw-verdict-line {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hw-verdict-line--ok {
+  border-color: rgba(61, 220, 132, 0.28);
+}
+
+.hw-verdict-line--warn {
+  border-color: rgba(230, 184, 77, 0.35);
+}
+
+.hw-verdict-line--bad {
+  border-color: rgba(240, 113, 120, 0.35);
+}
+
+.hw-verdict-line-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hw-verdict-line-text {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.hw-verdict-foot {
+  margin: 16px 0 0;
+  font-size: 12px;
+}
+
+.hw-verdict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.hw-details-title {
+  margin: 24px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .hw-layout {
   margin-top: 20px;
   display: grid;
