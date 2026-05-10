@@ -443,7 +443,12 @@ export default function InstallWizard() {
       step: WizardStep,
       r: ScriptResult,
       opts?: { skipInstallerStdoutLog?: boolean }
-    ): { message: string; state: StepState; wizardOllamaMissingOnly: boolean } => {
+    ): {
+      message: string
+      state: StepState
+      wizardOllamaMissingOnly: boolean
+      wizardGpuMissingOnly: boolean
+    } => {
       if (!opts?.skipInstallerStdoutLog) {
         appendLog(
           `${step.script} => ok=${r.ok} status=${r.status}${step.elevated ? ' [elevated]' : ''}`
@@ -467,14 +472,29 @@ export default function InstallWizard() {
         r.errors.length > 0 &&
         r.errors.every((e) => e.code === 'OLLAMA_NOT_FOUND')
 
-      let nextState: StepState = r.ok ? (r.warnings.length ? 'warning' : 'success') : 'error'
+      const wizardGpuMissingOnly =
+        step.id === 'gpu' &&
+        !r.ok &&
+        r.errors.length > 0 &&
+        r.errors.every((e) => e.code === 'NVIDIA_NOT_FOUND')
+
+      let nextState: StepState = r.ok
+        ? r.warnings.length > 0 || r.status === 'warning'
+          ? 'warning'
+          : 'success'
+        : 'error'
       let message = r.message
       if (wizardOllamaMissingOnly) {
         nextState = 'success'
         message =
           'Ollama is not installed yet (expected on a fresh machine). The next step installs it automatically.'
       }
-      return { message, state: nextState, wizardOllamaMissingOnly }
+      if (wizardGpuMissingOnly) {
+        nextState = 'success'
+        message =
+          'No NVIDIA GPU detected — Ollama and Open WebUI still run on this PC using the CPU (slower). NVIDIA-only extras (some Comfy bundles) stay optional. Continuing the install…'
+      }
+      return { message, state: nextState, wizardOllamaMissingOnly, wizardGpuMissingOnly }
     },
     [appendLog]
   )
@@ -624,7 +644,7 @@ export default function InstallWizard() {
       }
 
       runningScriptRef.current = null
-      const { message, state, wizardOllamaMissingOnly } = applyStepResult(step, r, {
+      const { message, state, wizardOllamaMissingOnly, wizardGpuMissingOnly } = applyStepResult(step, r, {
         skipInstallerStdoutLog: usedSkipInstallerLog
       })
       setCoreMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
@@ -636,7 +656,8 @@ export default function InstallWizard() {
           persistState: persistOutcome,
           message,
           result: r,
-          wizardOllamaMissingOnly
+          wizardOllamaMissingOnly,
+          wizardGpuMissingOnly
         })
         const nextPersist: WizardInstallPersisted = {
           ...wizardPersistRef.current,
@@ -648,17 +669,23 @@ export default function InstallWizard() {
         )
         setCoreChipKinds((c) => c.map((v, j) => (j === i ? snap.completionChip ?? null : v)))
       }
-      const rebootPause =
+      if (
         step.id === 'docker-install' &&
         r.ok &&
         typeof r.details === 'object' &&
         r.details !== null &&
         (r.details as Record<string, unknown>).rebootRequired === true
+      ) {
+        appendLog(
+          'NOTE: This PC may need a full Windows restart before Docker / WSL changes fully apply. The wizard continues — if the next Docker step fails, reboot once, then use “Continue install” from the Docker step or Troubleshooting.'
+        )
+      }
       const precheckAllowsNextInstaller =
-        !r.ok &&
-        step.id === 'ollama-check' &&
-        r.errors.some((err) => err.code === 'OLLAMA_NOT_FOUND')
-      if ((!r.ok && !precheckAllowsNextInstaller) || rebootPause) return false
+        (!r.ok &&
+          step.id === 'ollama-check' &&
+          r.errors.some((err) => err.code === 'OLLAMA_NOT_FOUND')) ||
+        (!r.ok && step.id === 'gpu' && r.errors.some((err) => err.code === 'NVIDIA_NOT_FOUND'))
+      if (!r.ok && !precheckAllowsNextInstaller) return false
       return true
     } catch (e) {
       runningScriptRef.current = null
@@ -798,7 +825,7 @@ export default function InstallWizard() {
             progressToken
           })
           runningScriptRef.current = null
-          const { message, state, wizardOllamaMissingOnly } = applyStepResult(step, r)
+          const { message, state, wizardOllamaMissingOnly, wizardGpuMissingOnly } = applyStepResult(step, r)
           setOptMessages((m) => m.map((v, idx) => (idx === i ? message : v)))
           setOptStates((s) => s.map((v, idx) => (idx === i ? state : v)))
           const persistOutcome = stepStateToPersistedOutcome(state)
@@ -808,7 +835,8 @@ export default function InstallWizard() {
               persistState: persistOutcome,
               message,
               result: r,
-              wizardOllamaMissingOnly
+              wizardOllamaMissingOnly,
+              wizardGpuMissingOnly
             })
             const next: WizardInstallPersisted = {
               ...wizardPersistRef.current,
@@ -938,8 +966,11 @@ export default function InstallWizard() {
       <h1 className="page-title">Install</h1>
       <p className="page-sub">
         Prefer <Link to="/check-my-pc">Check my PC</Link> first for a go / caution verdict on GPU, RAM, disk, and
-        ports. Core setup probes what is already installed (Ollama, Docker engine, Open WebUI) so installers and
-        UAC run only when needed. Chips show <strong>Installed</strong> vs <strong>Verified</strong> for clarity.{' '}
+        ports. <strong>No NVIDIA GPU?</strong> Core chat still installs — the GPU row is informational and the
+        wizard keeps going. <strong>Docker may ask for a reboot</strong> after WSL/DISM work; you can continue, then
+        reboot if the Docker check step complains. Core setup probes what is already installed (Ollama, Docker engine,
+        Open WebUI) so installers and UAC run only when needed. Chips show <strong>Installed</strong> vs{' '}
+        <strong>Verified</strong> for clarity.{' '}
         <strong>Run from here</strong> continues from that row through the rest of core setup (installer for
         that row forces once; probes still apply afterward). Installer scripts can spike CPU/Disk—that is
         expected; progress updates are intentionally throttled to keep the launcher light. Finished steps are

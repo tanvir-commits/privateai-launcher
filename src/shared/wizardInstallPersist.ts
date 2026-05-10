@@ -138,9 +138,9 @@ function shorten(text: string, max = 64): string {
 export function wizardStepVersionSubtitle(
   stepId: string,
   r: ScriptResult,
-  opts?: { wizardOllamaMissingOnly?: boolean }
+  opts?: { wizardOllamaMissingOnly?: boolean; wizardGpuMissingOnly?: boolean }
 ): string | undefined {
-  const wizardOk = !!(opts?.wizardOllamaMissingOnly ?? false)
+  const wizardOk = !!(opts?.wizardOllamaMissingOnly ?? false) || !!(opts?.wizardGpuMissingOnly ?? false)
   if (!r.ok && !wizardOk) return undefined
 
   const d =
@@ -152,6 +152,10 @@ export function wizardStepVersionSubtitle(
     case 'system':
       return str(d, 'osBuild') ? `Build ${String(d.osBuild)}` : str(d, 'osCaption')
     case 'gpu': {
+      if (opts?.wizardGpuMissingOnly) {
+        const label = str(d, 'readinessLabel')
+        return label ? shorten(label, 72) : 'No NVIDIA GPU (CPU-only stack)'
+      }
       const nam = str(d, 'gpuName')
       const dr = str(d, 'driverVersion')
       if (nam && dr) return shorten(`${nam} · driver ${dr}`, 72)
@@ -184,13 +188,21 @@ export function wizardStepVersionSubtitle(
 export function inferCompletionChip(
   stepId: string,
   r: ScriptResult,
-  opts?: { wizardOllamaMissingOnly?: boolean }
+  opts?: { wizardOllamaMissingOnly?: boolean; wizardGpuMissingOnly?: boolean }
 ): CompletionChipKind {
   if (
     opts?.wizardOllamaMissingOnly &&
     stepId === 'ollama-check' &&
     !r.ok &&
     r.errors.some((e) => e.code === 'OLLAMA_NOT_FOUND')
+  ) {
+    return 'verified'
+  }
+  if (
+    opts?.wizardGpuMissingOnly &&
+    stepId === 'gpu' &&
+    !r.ok &&
+    r.errors.some((e) => e.code === 'NVIDIA_NOT_FOUND')
   ) {
     return 'verified'
   }
@@ -239,14 +251,17 @@ export function persistedStepFromResult(args: {
   message: string
   result: ScriptResult
   wizardOllamaMissingOnly?: boolean
+  wizardGpuMissingOnly?: boolean
   completionChipOverride?: CompletionChipKind
 }): PersistedWizardStep {
   const version =
     wizardStepVersionSubtitle(args.stepId, args.result, {
-      wizardOllamaMissingOnly: args.wizardOllamaMissingOnly
+      wizardOllamaMissingOnly: args.wizardOllamaMissingOnly,
+      wizardGpuMissingOnly: args.wizardGpuMissingOnly
     }) ?? null
   const inferred = inferCompletionChip(args.stepId, args.result, {
-    wizardOllamaMissingOnly: args.wizardOllamaMissingOnly
+    wizardOllamaMissingOnly: args.wizardOllamaMissingOnly,
+    wizardGpuMissingOnly: args.wizardGpuMissingOnly
   })
 
   /** When script errored/warned, avoid “Installed” copy unless probe already satisfied. */
@@ -254,7 +269,8 @@ export function persistedStepFromResult(args: {
     args.completionChipOverride ??
     (args.persistState === 'success' ||
     args.persistState === 'warning' ||
-    (args.stepId === 'ollama-check' && !!args.wizardOllamaMissingOnly)
+    (args.stepId === 'ollama-check' && !!args.wizardOllamaMissingOnly) ||
+    (args.stepId === 'gpu' && !!args.wizardGpuMissingOnly)
       ? inferred
       : null)
 

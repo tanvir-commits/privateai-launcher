@@ -87,6 +87,18 @@ describe('wizardStepVersionSubtitle', () => {
     )
   })
 
+  it('honors wizard gpu-missing subtitle from readiness label', () => {
+    const r: ScriptResult = {
+      ok: false,
+      status: 'error',
+      message: 'No NVIDIA',
+      details: { readinessLabel: 'Unsupported: no NVIDIA GPU detected.' },
+      warnings: [],
+      errors: [{ code: 'NVIDIA_NOT_FOUND', message: 'x' }]
+    }
+    expect(wizardStepVersionSubtitle('gpu', r, { wizardGpuMissingOnly: true })).toContain('NVIDIA')
+  })
+
   it('reads ollamaVersion', () => {
     expect(
       wizardStepVersionSubtitle('ollama', okResult({ ollamaVersion: 'ollama version is 1.2.3' }))
