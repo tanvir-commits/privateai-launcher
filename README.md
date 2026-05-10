@@ -28,6 +28,7 @@ Local build + zip: `npm run dist:win:zip` → `release/PrivateAI-Launcher-<versi
 | `npm run test:ps` | PowerShell JSON contract smoke tests |
 | `npm run test:all` | Typecheck + Vitest + PowerShell smoke |
 | `node scripts/task.mjs test:all` | Same as test:all, no `npm.ps1` |
+| `npm run icon:from-apng -- <file.apng> [out.ico]` | Build multi-size `app-icon.ico` from APNG/PNG (first frame; optional `--frame N` with **ffmpeg**) |
 
 **Windows / PowerShell:** If `npm` fails with “running scripts is disabled”, either use **`npm.cmd`**, **`dev.bat`** in the repo root, or **`node scripts/task.mjs …`** above. This repo’s **`.vscode/settings.json`** defaults new terminals to **Command Prompt**, which avoids `npm.ps1`.
 
