@@ -422,6 +422,28 @@
         <div class="skeleton" style="margin-top: 18px"></div>
       </div>
 
+      <div class="card" id="release-vs-main">
+        <h2>New commits, same version?</h2>
+        <p class="release-meta" style="margin: 0">
+          The block above reads GitHub’s
+          <strong style="color: var(--text)">latest published release</strong> (a <code>v*</code> tag with attached
+          zip/installer). Pushing to <code>main</code> does <em>not</em> move that line until you
+          <strong>tag a new version</strong> and the Release Windows workflow finishes.
+        </p>
+        <p class="release-meta" style="margin: 14px 0 0">
+          To ship <strong>v1.2.0</strong> (example): bump <code>version</code> in <code>package.json</code>, commit, then
+          <code>git tag v1.2.0 &amp;&amp; git push origin v1.2.0</code> — CI attaches the new files to that release and
+          this page updates on refresh.
+        </p>
+        <p class="release-meta" style="margin: 14px 0 0">
+          Before the next tag, you can grab a one-off build from
+          <a href="https://github.com/tanvir-commits/privateai-launcher/actions/workflows/release-windows.yml"
+            >Release Windows</a
+          >: <strong>Run workflow</strong> → open the run → download the <strong>windows-release-build</strong> artifact
+          (zip + Setup.exe inside).
+        </p>
+      </div>
+
       <div class="card" id="portable-card">
         <h2>Portable zip</h2>
         <p class="release-meta" style="margin: 0 0 14px">
