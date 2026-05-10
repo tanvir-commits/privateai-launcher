@@ -176,6 +176,23 @@ a {
   line-height: 1.5;
 }
 
+.models-field {
+  width: 100%;
+  max-width: 380px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.models-field:focus {
+  outline: none;
+  border-color: #3b4a5e;
+}
+
 .row-actions {
   display: flex;
   flex-wrap: wrap;
