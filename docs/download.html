@@ -42,7 +42,7 @@
       }
 
       .wrap {
-        max-width: 720px;
+        max-width: 920px;
         margin: 0 auto;
         padding: 48px 22px 64px;
       }
@@ -109,13 +109,53 @@
       }
 
       .card:nth-of-type(1) {
-        animation-delay: 0.08s;
+        animation-delay: 0.06s;
       }
       .card:nth-of-type(2) {
-        animation-delay: 0.14s;
+        animation-delay: 0.11s;
       }
       .card:nth-of-type(3) {
-        animation-delay: 0.2s;
+        animation-delay: 0.16s;
+      }
+      .card:nth-of-type(4) {
+        animation-delay: 0.21s;
+      }
+
+      .shot-card {
+        padding: 14px 14px 10px;
+      }
+
+      .shot-frame {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(42, 53, 68, 0.9);
+        background: #05080c;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 50px rgba(0, 0, 0, 0.45);
+        line-height: 0;
+      }
+
+      .shot-frame img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .shot-caption {
+        margin: 14px 8px 6px;
+        font-size: 0.9rem;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.45;
+      }
+
+      .shot-badge {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 10px;
       }
 
       .card h2 {
@@ -343,6 +383,24 @@
         <h1>PrivateAI Launcher</h1>
         <p class="tagline">Windows downloads — run Ollama, Open WebUI, and Comfy locally.</p>
       </header>
+
+      <figure class="card shot-card" aria-labelledby="shot-caption">
+        <span class="shot-badge">Preview</span>
+        <div class="shot-frame">
+          <img
+            src="assets/dashboard.png"
+            width="1024"
+            height="589"
+            alt="PrivateAI Launcher: Dashboard with sidebar and status cards for Docker Desktop, Ollama, Open WebUI, and ComfyUI."
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <figcaption id="shot-caption" class="shot-caption">
+          The in-app <strong style="color: var(--text)">Dashboard</strong> gives you refresh, health checks, and
+          restart actions for your stack — Docker, Ollama, Open WebUI, and Comfy — in one dark, simple layout.
+        </figcaption>
+      </figure>
 
       <div id="status" class="card" aria-live="polite">
         <h2>Latest release</h2>

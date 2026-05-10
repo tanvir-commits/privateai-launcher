@@ -5,7 +5,7 @@ PrivateAI Launcher turns a supported Windows NVIDIA PC into a private local AI s
 ## Download (Windows)
 
 - **Stable link (GitHub):** [Latest release](https://github.com/tanvir-commits/privateai-launcher/releases/latest) — pick **`PrivateAI-Launcher-*-windows-portable.zip`** to unzip and run, or **`*-Setup.exe`** for an installer.
-- **Landing page:** GitHub Pages is configured with **GitHub Actions** as the build source ([`pages.yml`](.github/workflows/pages.yml)). After the workflow runs, open **`https://tanvir-commits.github.io/privateai-launcher/download.html`** (root redirects to the same). If Pages was never turned on, enable it once: **Settings → Pages → Build and deployment → Source: GitHub Actions**, or `gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow`.
+- **Landing page:** **`https://tanvir-commits.github.io/privateai-launcher/download.html`** — includes a Dashboard screenshot (`docs/assets/`) and live links to the latest release assets. Built by [`pages.yml`](.github/workflows/pages.yml). If Pages was never turned on: **Settings → Pages → Source: GitHub Actions**, or `gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow`.
 - **Ship a release from CI:** push a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0` — [Release Windows](.github/workflows/release-windows.yml) builds and uploads the zip and installer to that release.
 
 Local build + zip: `npm run dist:win:zip` → `release/PrivateAI-Launcher-<version>-windows-portable.zip`.
