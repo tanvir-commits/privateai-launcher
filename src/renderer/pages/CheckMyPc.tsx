@@ -177,6 +177,20 @@ export default function CheckMyPc() {
                 <dd>{formatBytes(sys.ramBytes)}</dd>
               </div>
               <div className="hw-dl-row">
+                <dt>Processor</dt>
+                <dd>{sys.cpuName ?? '—'}</dd>
+              </div>
+              <div className="hw-dl-row">
+                <dt>CPU cores</dt>
+                <dd>
+                  {sys.cpuPhysicalCores != null && sys.cpuLogicalProcessors != null
+                    ? `${sys.cpuPhysicalCores} physical / ${sys.cpuLogicalProcessors} logical`
+                    : sys.cpuLogicalProcessors != null
+                      ? `${sys.cpuLogicalProcessors} logical`
+                      : '—'}
+                </dd>
+              </div>
+              <div className="hw-dl-row">
                 <dt>Free on C:</dt>
                 <dd>{formatBytes(sys.diskCFreeBytes ?? undefined)}</dd>
               </div>

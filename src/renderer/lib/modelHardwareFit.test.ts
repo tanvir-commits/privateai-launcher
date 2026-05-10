@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import type { HardwareScanPayload } from '@shared/preloadApi'
 import type { ScriptResult } from '@shared/scriptContract'
-import { buildModelProfileFit, hardwareSummaryLine, sortProfilesByHardwareFit, type ModelProfileRow } from './modelHardwareFit'
+import {
+  buildModelProfileFit,
+  hardwareSummaryLine,
+  inferredMinLogicalForOllamaTag,
+  sortProfilesByHardwareFit,
+  type ModelProfileRow
+} from './modelHardwareFit'
 
-function systemOk(ramGb: number, over: Partial<ScriptResult> = {}): ScriptResult {
+type CpuOpts = { threads?: number; physical?: number; name?: string }
+
+function systemOk(ramGb: number, cpu?: CpuOpts, over: Partial<ScriptResult> = {}): ScriptResult {
+  const threads = cpu?.threads ?? 16
+  const physical = cpu?.physical ?? 8
+  const name = cpu?.name ?? 'Test CPU'
+  const { details: _d, ...restOver } = over
   return {
     ok: true,
     status: 'success',
@@ -13,11 +25,15 @@ function systemOk(ramGb: number, over: Partial<ScriptResult> = {}): ScriptResult
       osBuild: 26200,
       ramBytes: ramGb * 1024 ** 3,
       diskCFreeBytes: 200 * 1024 ** 3,
-      ports: {}
+      ports: {},
+      cpuLogicalProcessors: threads,
+      cpuPhysicalCores: physical,
+      cpuName: name,
+      ...(typeof over.details === 'object' && over.details !== null ? (over.details as Record<string, unknown>) : {})
     },
     warnings: [],
     errors: [],
-    ...over
+    ...restOver
   } as ScriptResult
 }
 
@@ -71,7 +87,8 @@ const text7b: ModelProfileRow = {
   approxSizeGb: 4.5,
   minVramGb: 6,
   minRamGb: 8,
-  cpuFallbackPull: 'llama3.2:3b'
+  cpuFallbackPull: 'llama3.2:3b',
+  minLogicalProcessorsGpu: 6
 }
 
 const vision: ModelProfileRow = {
@@ -84,6 +101,15 @@ const vision: ModelProfileRow = {
   minRamGb: 8,
   requiresNvidia: true
 }
+
+describe('inferredMinLogicalForOllamaTag', () => {
+  it('maps small tags to 4', () => {
+    expect(inferredMinLogicalForOllamaTag('llama3.2:3b')).toBe(4)
+  })
+  it('maps 7b-class tags to 8', () => {
+    expect(inferredMinLogicalForOllamaTag('qwen2.5:7b')).toBe(8)
+  })
+})
 
 describe('buildModelProfileFit', () => {
   it('asks for Check my PC when there is no scan', () => {
@@ -100,6 +126,17 @@ describe('buildModelProfileFit', () => {
     const f = buildModelProfileFit(text7b, scan)
     expect(f.label).toBe('substitute')
     expect(f.effectivePull).toBe('llama3.2:3b')
+  })
+
+  it('tightens CPU-only fit when very few threads', () => {
+    const scan: HardwareScanPayload = {
+      system: systemOk(16, { threads: 2 }),
+      gpu: gpuMissing()
+    }
+    const f = buildModelProfileFit(text7b, scan)
+    expect(f.label).toBe('tight')
+    expect(f.effectivePull).toBe('llama3.2:3b')
+    expect(f.hint).toMatch(/2 CPU thread/)
   })
 
   it('flags vision when no NVIDIA', () => {
@@ -119,7 +156,7 @@ describe('buildModelProfileFit', () => {
     expect(f.effectivePull).toBe('llama3.2:3b')
   })
 
-  it('marks ideal when VRAM has headroom', () => {
+  it('marks ideal when VRAM has headroom and CPU is strong enough', () => {
     const scan: HardwareScanPayload = {
       system: systemOk(16),
       gpu: gpuOk(12 * 1024)
@@ -127,6 +164,16 @@ describe('buildModelProfileFit', () => {
     const f = buildModelProfileFit(text7b, scan)
     expect(f.label).toBe('ideal')
     expect(f.effectivePull).toBe('qwen2.5:7b')
+  })
+
+  it('softens GPU fit when CPU thread count is low', () => {
+    const scan: HardwareScanPayload = {
+      system: systemOk(16, { threads: 4 }),
+      gpu: gpuOk(12 * 1024)
+    }
+    const f = buildModelProfileFit(text7b, scan)
+    expect(f.label).toBe('ok')
+    expect(f.hint).toMatch(/Few CPU threads/)
   })
 })
 
@@ -148,13 +195,14 @@ describe('hardwareSummaryLine', () => {
     expect(hardwareSummaryLine(null)).toBeNull()
   })
 
-  it('includes RAM and VRAM when present', () => {
+  it('includes RAM, CPU layout, and VRAM when present', () => {
     const scan: HardwareScanPayload = {
       system: systemOk(16),
       gpu: gpuOk(8192)
     }
     const line = hardwareSummaryLine(scan)
     expect(line).toMatch(/16\.0 GB RAM/)
+    expect(line).toMatch(/8c\/16t/)
     expect(line).toMatch(/8\.0 GB VRAM/)
   })
 })

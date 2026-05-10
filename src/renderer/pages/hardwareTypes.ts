@@ -8,6 +8,10 @@ export interface ParsedSystemDetails {
   ramBytes?: number
   diskCFreeBytes?: number | null
   ports?: SystemPorts
+  cpuName?: string
+  cpuPhysicalCores?: number
+  /** Logical processors (threads); used for CPU-only Ollama and host-side load hints. */
+  cpuLogicalProcessors?: number
 }
 
 export interface ParsedGpuDetails {
@@ -29,7 +33,11 @@ export function parseSystemDetails(r: ScriptResult | null | undefined): ParsedSy
     osBuild: typeof o.osBuild === 'number' ? o.osBuild : undefined,
     ramBytes: typeof o.ramBytes === 'number' ? o.ramBytes : undefined,
     diskCFreeBytes: typeof o.diskCFreeBytes === 'number' ? o.diskCFreeBytes : o.diskCFreeBytes === null ? null : undefined,
-    ports: o.ports && typeof o.ports === 'object' ? (o.ports as SystemPorts) : undefined
+    ports: o.ports && typeof o.ports === 'object' ? (o.ports as SystemPorts) : undefined,
+    cpuName: typeof o.cpuName === 'string' && o.cpuName.trim().length > 0 ? o.cpuName.trim() : undefined,
+    cpuPhysicalCores: typeof o.cpuPhysicalCores === 'number' && o.cpuPhysicalCores > 0 ? o.cpuPhysicalCores : undefined,
+    cpuLogicalProcessors:
+      typeof o.cpuLogicalProcessors === 'number' && o.cpuLogicalProcessors > 0 ? o.cpuLogicalProcessors : undefined
   }
 }
 

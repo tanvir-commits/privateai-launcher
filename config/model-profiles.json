@@ -8,6 +8,7 @@
       "approxSizeGb": 2,
       "minVramGb": 0,
       "minRamGb": 8,
+      "minLogicalProcessorsCpu": 4,
       "requiresNvidia": false
     },
     {
@@ -19,6 +20,7 @@
       "minVramGb": 6,
       "minRamGb": 8,
       "cpuFallbackPull": "llama3.2:3b",
+      "minLogicalProcessorsGpu": 6,
       "requiresNvidia": false
     },
     {
@@ -29,6 +31,7 @@
       "approxSizeGb": 6,
       "minVramGb": 10,
       "minRamGb": 8,
+      "minLogicalProcessorsGpu": 6,
       "requiresNvidia": true
     },
     {
@@ -39,6 +42,7 @@
       "approxSizeGb": 12,
       "minVramGb": 8,
       "minRamGb": 12,
+      "minLogicalProcessorsGpu": 6,
       "requiresNvidia": true
     }
   ]

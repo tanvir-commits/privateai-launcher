@@ -47,11 +47,25 @@ try {
 
     $virtFw = $null
     $vmMon = $null
+    $cpuName = $null
+    $cpuPhysicalCores = $null
+    $cpuLogicalProcessors = $null
     try {
         $p0 = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($null -ne $p0) {
             $virtFw = $p0.VirtualizationFirmwareEnabled
             $vmMon = $p0.VMMonitorModeExtensions
+            try { $cpuName = [string]$p0.Name } catch { }
+            try {
+                $c = [int]$p0.NumberOfCores
+                if ($c -gt 0) { $cpuPhysicalCores = $c }
+            }
+            catch { }
+            try {
+                $lp = [int]$p0.NumberOfLogicalProcessors
+                if ($lp -gt 0) { $cpuLogicalProcessors = $lp }
+            }
+            catch { }
         }
     }
     catch { }
@@ -111,6 +125,9 @@ try {
         virtualizationFirmwareEnabled   = $virtFw
         vmMonitorModeExtensions         = $vmMon
         hypervisorPresent               = $hypervisorPresent
+        cpuName                         = $cpuName
+        cpuPhysicalCores                = $cpuPhysicalCores
+        cpuLogicalProcessors            = $cpuLogicalProcessors
     }
 
     $msg = 'System scan complete.'

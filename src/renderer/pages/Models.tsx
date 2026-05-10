@@ -127,7 +127,7 @@ export default function Models() {
         the launcher. Pull models here (or with <code style={{ fontSize: '0.9em' }}>ollama pull</code> in a
         terminal); they show up in Open WebUI after a refresh. Pick defaults and per-chat models inside Open WebUI
         (Settings → Models). Starters below are <strong>ordered for this machine</strong> when a hardware snapshot
-        exists (same scan as Check my PC).
+        exists (same scan as Check my PC: GPU, CPU threads, and RAM).
       </p>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -139,7 +139,7 @@ export default function Models() {
         ) : !lastHw ? (
           <p className="muted" style={{ marginBottom: 12 }}>
             No snapshot yet. Run <NavLink to="/check-my-pc">Check my PC</NavLink> once, or scan from here — then we
-            sort starters by GPU VRAM and RAM and suggest smaller pulls when VRAM is tight.
+            sort starters by GPU VRAM, CPU thread count, and RAM — and suggest smaller pulls when VRAM is tight.
           </p>
         ) : (
           <>
@@ -165,7 +165,9 @@ export default function Models() {
         {hwFetched && !lastHw?.error ? (
           <p className="muted" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
             Thresholds come from <code>config/model-profiles.json</code> — tune <code>minVramGb</code>,{' '}
-            <code>minRamGb</code>, and <code>cpuFallbackPull</code> if you want different guidance.
+            <code>minRamGb</code>, <code>minLogicalProcessorsCpu</code> (primary tag only) /{' '}
+            <code>minLogicalProcessorsGpu</code>, and{' '}
+            <code>cpuFallbackPull</code> if you want different guidance.
           </p>
         ) : null}
       </div>
