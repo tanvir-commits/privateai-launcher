@@ -94,6 +94,32 @@ describe('buildHardwareVerdictView', () => {
     expect(v.lines.find((l) => l.name.startsWith('ComfyUI'))?.status).toBe('bad')
   })
 
+  it('returns heads-up caution when only a default port is busy on a strong GPU', () => {
+    const sys = systemBase({
+      details: {
+        osCaption: 'Windows',
+        osBuild: 26200,
+        ramBytes: 32 * 1024 ** 3,
+        diskCFreeBytes: 200 * 1024 ** 3,
+        ports: {
+          ollama: { port: 11434, free: true },
+          openWebui: { port: 3000, free: false },
+          comfyui: { port: 8188, free: true }
+        }
+      }
+    })
+    const last: HardwareScanPayload = { system: sys, gpu: gpuBase() }
+    const v = buildHardwareVerdictView(
+      last,
+      parseSystemDetails(last.system),
+      parseGpuDetails(last.gpu),
+      true
+    )
+    expect(v.kind).toBe('caution')
+    expect(v.badge).toBe('Heads-up')
+    expect(v.headline).toMatch(/port/i)
+  })
+
   it('returns caution when RAM under 8GB even with good GPU', () => {
     const sys = systemBase({
       details: {

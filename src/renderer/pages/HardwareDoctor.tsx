@@ -117,9 +117,6 @@ export default function HardwareDoctor() {
                   <span className="hw-readiness-dot" />
                   <span>{gpu.readinessLabel}</span>
                 </div>
-                {gpu.readiness ? (
-                  <p className="hw-readiness-tier muted">Tier: {gpu.readiness}</p>
-                ) : null}
                 {gpu.readiness === 'unsupported' ? (
                   <p className="muted hw-note" style={{ marginTop: 12 }}>
                     No GeForce/RTX GPU was seen by the scan (common on Intel- or AMD-only laptops). Ollama can still run

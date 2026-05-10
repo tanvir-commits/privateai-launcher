@@ -210,6 +210,20 @@ export function buildHardwareVerdictView(
   if (portsBusy) reasons.push('a default service port is in use')
   if (tierBasic && gpuOk) reasons.push('borderline GPU VRAM')
 
+  const onlyPortsBusy = portsBusy && gpuOk && tierOk && !lowRam && !lowDisk && !unsupported
+
+  if (onlyPortsBusy) {
+    return {
+      kind: 'caution',
+      badge: 'Heads-up',
+      headline: 'Hardware looks strong — a default port is busy',
+      explanation:
+        'GPU, RAM, and disk are fine for this stack. Something is already listening on one of the default ports (often a previous install or another app). Use the checklist below, free or remap that port, then scan again for a green verdict.',
+      lines,
+      footnote: 'This is not a “weak PC” warning — it is only about port availability.'
+    }
+  }
+
   return {
     kind: 'caution',
     badge: 'Yellow light',

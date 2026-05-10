@@ -465,11 +465,6 @@ a.btn {
   line-height: 1.45;
 }
 
-.hw-readiness-tier {
-  margin: 8px 0 0;
-  font-size: 12px;
-}
-
 .hw-readiness .hw-readiness-dot {
   width: 10px;
   height: 10px;
