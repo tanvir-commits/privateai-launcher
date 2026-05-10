@@ -1,4 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
+import logoUrl from './assets/logo.png'
 import Dashboard from './pages/Dashboard'
 import HardwareDoctor from './pages/HardwareDoctor'
 import InstallWizard from './pages/InstallWizard'
@@ -11,7 +12,10 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">PrivateAI Launcher</div>
+        <div className="brand">
+          <img src={logoUrl} alt="" className="brand-logo" width={28} height={28} />
+          <span className="brand-text">PrivateAI Launcher</span>
+        </div>
         <NavLink className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')} to="/">
           Dashboard
         </NavLink>

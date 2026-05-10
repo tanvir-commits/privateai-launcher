@@ -77,9 +77,11 @@
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
 
-      .logo svg {
-        width: 30px;
-        height: 30px;
+      .logo img {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
+        border-radius: 10px;
       }
 
       h1 {
@@ -384,17 +386,8 @@
   <body>
     <div class="wrap">
       <header>
-        <div class="logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M8 22c0-6 3-10 8-12 5 2 8 6 8 12M12 10c2-2 6-2 8 0"
-              stroke="#3ddc84"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <circle cx="16" cy="24" r="3" fill="#3ddc84" opacity="0.9" />
-          </svg>
+        <div class="logo">
+          <img src="assets/logo.png" width="128" height="128" alt="" decoding="async" />
         </div>
         <h1>PrivateAI Launcher</h1>
         <p class="tagline">Windows downloads — run Ollama, Open WebUI, and Comfy locally.</p>
